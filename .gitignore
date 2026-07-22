@@ -1,0 +1,39 @@
+node_modules/
+.output/
+.nuxt/
+dist/
+*.db
+*.db-wal
+*.db-shm
+
+# Runtime
+.dev.pid
+dev.sh
+
+# Secrets
+.env
+.DS_Store
+
+# Cache
+cache/*
+!cache/.gitkeep
+
+# Generated covers (in backend)
+covers/*
+!covers/.gitkeep
+backend/covers/*
+!backend/covers/.gitkeep
+
+# Local CV database (track folder, ignore content)
+localcvdb/*
+!localcvdb/.gitkeep
+
+# Comic test files (track folder, ignore content)
+comics/*
+!comics/.gitkeep
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
