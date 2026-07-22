@@ -1011,13 +1011,14 @@ function initSchema(db) {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+  const defaultPath = process.env.COMICS_DIR || "../comics";
   const existing = db.prepare(
-    "SELECT id FROM library_folders WHERE type = 'local' AND path = '/comics'"
-  ).get();
+    "SELECT id FROM library_folders WHERE type = 'local' AND path = ?"
+  ).get(defaultPath);
   if (!existing) {
     db.prepare(
-      "INSERT INTO library_folders (path, label, type, active) VALUES ('/comics', 'Comics', 'local', 1)"
-    ).run();
+      "INSERT INTO library_folders (path, label, type, active) VALUES (?, 'Comics', 'local', 1)"
+    ).run(defaultPath);
   }
 }
 
@@ -1033,16 +1034,16 @@ const plugins = [
 const assets = {
   "/index.mjs": {
     "type": "text/javascript; charset=utf-8",
-    "etag": "\"1cb55-JEMPgZq3y4f3/lh51gDutz6Y4I8\"",
-    "mtime": "2026-07-22T20:45:05.706Z",
-    "size": 117589,
+    "etag": "\"1cc47-n9rRlAxSaw/gObSw1gNRd88g/9g\"",
+    "mtime": "2026-07-22T20:54:30.197Z",
+    "size": 117831,
     "path": "index.mjs"
   },
   "/index.mjs.map": {
     "type": "application/json",
-    "etag": "\"6b505-4/9bRyqrW4IWQYh9O0c3gs6VB/I\"",
-    "mtime": "2026-07-22T20:45:05.706Z",
-    "size": 439557,
+    "etag": "\"6b8c8-CI1oa7VDy3ouRd5W9iXhgxbRkQo\"",
+    "mtime": "2026-07-22T20:54:30.197Z",
+    "size": 440520,
     "path": "index.mjs.map"
   }
 };
@@ -2695,7 +2696,8 @@ const _id_$2 = defineEventHandler(async (event) => {
   if (method === "DELETE") {
     const folder = db.prepare("SELECT * FROM library_folders WHERE id = ?").get(id);
     if (!folder) throw createError({ statusCode: 404, statusMessage: "Folder not found" });
-    if (folder.type === "local" && folder.path === "/comics") {
+    const defaultPath = process.env.COMICS_DIR || "../comics";
+    if (folder.type === "local" && folder.path === defaultPath) {
       throw createError({ statusCode: 403, statusMessage: "The default Comics folder cannot be deleted" });
     }
     db.prepare("DELETE FROM library_folders WHERE id = ?").run(id);
@@ -2738,8 +2740,9 @@ const index$2 = defineEventHandler(async (event) => {
   const method = getMethod(event);
   if (method === "GET") {
     const folders = db.prepare("SELECT * FROM library_folders ORDER BY created_at ASC").all();
+    const defaultPath = process.env.COMICS_DIR || "../comics";
     for (const f of folders) {
-      if (f.type === "local" && f.path === "/comics") f.protected = true;
+      if (f.type === "local" && f.path === defaultPath) f.protected = true;
     }
     return { folders };
   }

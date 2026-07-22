@@ -87,12 +87,13 @@ function initSchema(db: Database.Database): void {
   `);
 
   // Ensure default /comics local folder exists
+  const defaultPath = process.env.COMICS_DIR || "../comics";
   const existing = db.prepare(
-    "SELECT id FROM library_folders WHERE type = 'local' AND path = '/comics'"
-  ).get();
+    "SELECT id FROM library_folders WHERE type = 'local' AND path = ?"
+  ).get(defaultPath);
   if (!existing) {
     db.prepare(
-      "INSERT INTO library_folders (path, label, type, active) VALUES ('/comics', 'Comics', 'local', 1)"
-    ).run();
+      "INSERT INTO library_folders (path, label, type, active) VALUES (?, 'Comics', 'local', 1)"
+    ).run(defaultPath);
   }
 }

@@ -13,9 +13,9 @@ export default defineEventHandler(async (event) => {
   // GET — list all library folders
   if (method === "GET") {
     const folders = db.prepare("SELECT * FROM library_folders ORDER BY created_at ASC").all() as any[];
-    // Mark the default /comics folder as protected
+    const defaultPath = process.env.COMICS_DIR || "../comics";
     for (const f of folders) {
-      if (f.type === "local" && f.path === "/comics") f.protected = true;
+      if (f.type === "local" && f.path === defaultPath) f.protected = true;
     }
     return { folders };
   }

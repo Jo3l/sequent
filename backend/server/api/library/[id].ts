@@ -54,8 +54,8 @@ export default defineEventHandler(async (event) => {
   if (method === "DELETE") {
     const folder = db.prepare("SELECT * FROM library_folders WHERE id = ?").get(id) as any;
     if (!folder) throw createError({ statusCode: 404, statusMessage: "Folder not found" });
-    // Protect the default /comics local folder
-    if (folder.type === "local" && folder.path === "/comics") {
+    const defaultPath = process.env.COMICS_DIR || "../comics";
+    if (folder.type === "local" && folder.path === defaultPath) {
       throw createError({ statusCode: 403, statusMessage: "The default Comics folder cannot be deleted" });
     }
     db.prepare("DELETE FROM library_folders WHERE id = ?").run(id);

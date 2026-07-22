@@ -24,4 +24,5 @@ services:
       NITRO_JWT_SECRET: ${JWT_SECRET:-}
       COMIC_VINE_API_KEY: ${COMIC_VINE_API_KEY:-}
       DATA_DIR: /data
+      COMICS_DIR: /comics
       LOCALCVDB_PATH: ${LOCALCVDB_PATH:-/data/localcvdb/localcv.db}
