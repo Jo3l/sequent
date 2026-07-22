@@ -1,13 +1,13 @@
 import { getRouterParam } from "h3";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { getDb } from "../../utils/db";
+import { getDb, getDataPath } from "../../utils/db";
 
 /**
  * Serve a comic cover by comic ID.
  * GET /api/covers/:id
  *
- * First tries the centralized covers/{id}.webp, then falls back to
+ * First tries the centralized data/covers/{id}.webp, then falls back to
  * the cover_path stored in the database (alongside the comic file).
  */
 export default defineEventHandler(async (event) => {
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
   if (isNaN(id)) throw createError({ statusCode: 400, statusMessage: "Invalid ID" });
 
   // Try centralized directory first
-  const coversDir = resolve(process.cwd(), "covers");
+  const coversDir = getDataPath("covers");
   for (const ext of ["webp", "jpg", "jpeg", "png"]) {
     const p = resolve(coversDir, `${id}.${ext}`);
     if (existsSync(p)) {

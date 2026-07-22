@@ -14,21 +14,23 @@ dev.sh
 .env
 .DS_Store
 
-# Cache
-cache/*
-!cache/.gitkeep
+# Data directory — keep directory scaffolding, ignore runtime contents
+data/*
+!data/.gitkeep
+!data/covers/
+!data/cache/
+!data/localcvdb/
+data/covers/*
+!data/covers/.gitkeep
+data/cache/*
+!data/cache/.gitkeep
+!data/cache/extracted/
+data/cache/extracted/*
+!data/cache/extracted/.gitkeep
+data/localcvdb/*
+!data/localcvdb/.gitkeep
 
-# Generated covers (in backend)
-covers/*
-!covers/.gitkeep
-backend/covers/*
-!backend/covers/.gitkeep
-
-# Local CV database (track folder, ignore content)
-localcvdb/*
-!localcvdb/.gitkeep
-
-# Comic test files (track folder, ignore content)
+# Comic files (volume in Docker, test files locally)
 comics/*
 !comics/.gitkeep
 

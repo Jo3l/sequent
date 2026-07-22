@@ -1,0 +1,36 @@
+# Agent instructions
+
+## Versioning rule
+
+Every time the user asks to **commit and push**, bump the minor version first:
+
+- `frontend/utils/constants.ts` → `APP_VERSION`
+- `frontend/package.json` → `version`
+
+Increment pattern: `1.0` → `1.1` → `1.2` → … until the user says to move to the next major version (e.g. `2.0`).
+
+## Commit and push procedure
+
+After bumping the version, run the following commands in order:
+
+```bash
+git add -A
+git commit -m "<message>"
+git tag v<NEW_VERSION>
+git push && git push --tags
+```
+
+Pushing the tag triggers the GitHub Actions workflow (`.github/workflows/docker-publish.yml`), which builds and pushes the Docker image to **GitHub Container Registry** with both the version tag (`ghcr.io/jo3l/sequent:1.x`) and `latest`. No extra secrets needed — it uses the built-in `GITHUB_TOKEN`.
+
+## Tag housekeeping
+
+After each `git push --tags`, clean up old tags to keep only the latest 2:
+
+```bash
+# Delete all tags except the two most recent, locally
+git tag -l | sort -V | head -n -2 | xargs -r git tag -d
+# Push deletions to remote
+git push origin --delete $(git tag -l | sort -V | head -n -2)
+```
+
+This prevents tag bloat on the repository and keeps the tag list useful. The two most recent tags are always retained so the Docker CI can still build from the previous tag if needed.

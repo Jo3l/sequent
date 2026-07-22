@@ -1,0 +1,32 @@
+node_modules/
+.output/
+.nuxt/
+dist/
+*.db
+*.db-wal
+*.db-shm
+
+# Runtime
+.dev.pid
+dev.sh
+
+# Secrets
+.env
+
+# Data
+data/
+
+# Comics
+comics/
+localcvdb/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Git
+.git/
+.gitignore

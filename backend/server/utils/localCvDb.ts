@@ -12,11 +12,24 @@ import { resolve } from "node:path";
 // ── DB connection ────────────────────────────────────────────────────────────
 
 function getDefaultDbPath(): string {
+  // Respect DATA_DIR (Docker: /data, local dev: not set)
+  if (process.env.DATA_DIR) {
+    for (const rel of [
+      "localcvdb/localcvdb_20260109/localcv.db",
+      "localcvdb/localcv.db",
+    ]) {
+      const p = resolve(process.env.DATA_DIR, rel);
+      if (existsSync(p)) return p;
+    }
+    return resolve(process.env.DATA_DIR, "localcvdb/localcv.db");
+  }
   const cwd = process.cwd();
   const candidates = [
     resolve(cwd, "../localcvdb/localcvdb_20260109/localcv.db"),
     resolve(cwd, "../../localcvdb/localcvdb_20260109/localcv.db"),
     resolve(cwd, "localcvdb/localcvdb_20260109/localcv.db"),
+    resolve(cwd, "../data/localcvdb/localcvdb_20260109/localcv.db"),
+    resolve(cwd, "../../data/localcvdb/localcvdb_20260109/localcv.db"),
   ];
   for (const p of candidates) {
     if (existsSync(p)) return p;

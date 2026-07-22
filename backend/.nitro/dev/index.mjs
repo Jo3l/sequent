@@ -938,18 +938,27 @@ function defineNitroPlugin(def) {
 
 let _db = null;
 function getDataDir() {
-  const cwd = process.cwd();
-  if (existsSync(resolve(cwd, "data"))) {
-    return resolve(cwd, "data");
+  if (process.env.DATA_DIR) {
+    const dir = resolve(process.env.DATA_DIR);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    return dir;
   }
-  const alt = resolve(cwd, "..", "data");
-  if (!existsSync(alt)) mkdirSync(alt, { recursive: true });
-  return alt;
+  const cwd = process.cwd();
+  const rootData = resolve(cwd, "..", "data");
+  if (!existsSync(rootData)) mkdirSync(rootData, { recursive: true });
+  return rootData;
+}
+function getDataPath(...segments) {
+  const base = getDataDir();
+  if (segments.length === 0) return base;
+  const dir = resolve(base, ...segments);
+  const parent = resolve(dir, "..");
+  if (!existsSync(parent)) mkdirSync(parent, { recursive: true });
+  return dir;
 }
 function getDb() {
   if (!_db) {
-    const dataDir = getDataDir();
-    const dbPath = resolve(dataDir, "comics.db");
+    const dbPath = getDataPath("comics.db");
     _db = new Database(dbPath);
     _db.pragma("journal_mode = WAL");
     _db.pragma("foreign_keys = ON");
@@ -1016,16 +1025,16 @@ const plugins = [
 const assets = {
   "/index.mjs": {
     "type": "text/javascript; charset=utf-8",
-    "etag": "\"1c5f6-kCYgPkJcYFJWHyUcjsanqfoQj5k\"",
-    "mtime": "2026-07-22T12:52:54.021Z",
-    "size": 116214,
+    "etag": "\"1c8f4-OivFjpgi9xriCHLcofJ4Awtz4LY\"",
+    "mtime": "2026-07-22T20:21:17.072Z",
+    "size": 116980,
     "path": "index.mjs"
   },
   "/index.mjs.map": {
     "type": "application/json",
-    "etag": "\"6a006-xy06owf0+K/bqAKYHL5guzFTWIg\"",
-    "mtime": "2026-07-22T12:52:54.021Z",
-    "size": 434182,
+    "etag": "\"6aa32-UlUIOjltq0Q7Vcj1rwb2pS/nZIs\"",
+    "mtime": "2026-07-22T20:21:17.072Z",
+    "size": 436786,
     "path": "index.mjs.map"
   }
 };
@@ -1627,11 +1636,23 @@ const _id_$5 = /*#__PURE__*/Object.freeze({
 });
 
 function getDefaultDbPath() {
+  if (process.env.DATA_DIR) {
+    for (const rel of [
+      "localcvdb/localcvdb_20260109/localcv.db",
+      "localcvdb/localcv.db"
+    ]) {
+      const p = resolve(process.env.DATA_DIR, rel);
+      if (existsSync(p)) return p;
+    }
+    return resolve(process.env.DATA_DIR, "localcvdb/localcv.db");
+  }
   const cwd = process.cwd();
   const candidates = [
     resolve(cwd, "../localcvdb/localcvdb_20260109/localcv.db"),
     resolve(cwd, "../../localcvdb/localcvdb_20260109/localcv.db"),
-    resolve(cwd, "localcvdb/localcvdb_20260109/localcv.db")
+    resolve(cwd, "localcvdb/localcvdb_20260109/localcv.db"),
+    resolve(cwd, "../data/localcvdb/localcvdb_20260109/localcv.db"),
+    resolve(cwd, "../../data/localcvdb/localcvdb_20260109/localcv.db")
   ];
   for (const p of candidates) {
     if (existsSync(p)) return p;
@@ -2170,7 +2191,7 @@ function extractImageFromArchive(archivePath, imageName, destDir) {
   }
 }
 
-const CACHE_DIR = resolve(process.cwd(), "cache", "extracted");
+const CACHE_DIR = getDataPath("cache");
 const CACHE_TTL = 60 * 60 * 1e3;
 const _page__get = defineEventHandler(async (event) => {
   const rawId = getRouterParam(event, "id");
@@ -2518,7 +2539,7 @@ const _id__get = defineEventHandler(async (event) => {
   const rawId = getRouterParam(event, "id");
   const id = parseInt(rawId || "", 10);
   if (isNaN(id)) throw createError({ statusCode: 400, statusMessage: "Invalid ID" });
-  const coversDir = resolve(process.cwd(), "covers");
+  const coversDir = getDataPath("covers");
   for (const ext of ["webp", "jpg", "jpeg", "png"]) {
     const p = resolve(coversDir, `${id}.${ext}`);
     if (existsSync(p)) {
@@ -2879,7 +2900,7 @@ const scan_post = defineEventHandler(async (event) => {
     updatedComics: 0,
     errors: []
   };
-  const coversDir = resolve(process.cwd(), "covers");
+  const coversDir = getDataPath("covers");
   const { mkdirSync } = await import('node:fs');
   mkdirSync(coversDir, { recursive: true });
   for (const folder of library) {

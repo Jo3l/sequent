@@ -1,11 +1,11 @@
-import { getDb } from "../../../../utils/db";
+import { getDb, getDataPath } from "../../../../utils/db";
 import { getRouterParam } from "h3";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { execSync } from "node:child_process";
 import { extractImageFromArchive, listArchiveImages, getArchiveType } from "../../../../utils/comicArchive";
 
-const CACHE_DIR = resolve(process.cwd(), "cache", "extracted");
+const CACHE_DIR = getDataPath("cache");
 const CACHE_TTL = 60 * 60 * 1000;
 
 export default defineEventHandler(async (event) => {

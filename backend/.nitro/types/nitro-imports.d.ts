@@ -51,6 +51,8 @@ declare global {
   const getComicInfo: typeof import('../../server/utils/comicArchive').getComicInfo
   const getComicVineIssue: typeof import('../../server/utils/comicVine').getComicVineIssue
   const getCookie: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getCookie
+  const getDataDir: typeof import('../../server/utils/db').getDataDir
+  const getDataPath: typeof import('../../server/utils/db').getDataPath
   const getDb: typeof import('../../server/utils/db').getDb
   const getHeader: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getHeader
   const getHeaders: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getHeaders
@@ -190,7 +192,7 @@ export { appendCorsHeaders, appendCorsPreflightHeaders, appendHeader, appendHead
 export { getArchiveType, isComicFile, extractComicInfoXml, parseComicInfoXml, getComicInfo, extractFirstPageImage, listArchiveImages, extractImageFromArchive } from '/home/jo3l/www/sequent/backend/server/utils/comicArchive';
 export { generateCover, coverPathFor, readCoverMetadata } from '/home/jo3l/www/sequent/backend/server/utils/comicCover';
 export { searchComicVine, getComicVineIssue } from '/home/jo3l/www/sequent/backend/server/utils/comicVine';
-export { getDb } from '/home/jo3l/www/sequent/backend/server/utils/db';
+export { getDataDir, getDataPath, getDb } from '/home/jo3l/www/sequent/backend/server/utils/db';
 export { parseFilename, normalizeFilename } from '/home/jo3l/www/sequent/backend/server/utils/filenameParser';
 export { createToken, verifyToken } from '/home/jo3l/www/sequent/backend/server/utils/jwt';
 export { sanitizeTitle, titlesMatch, searchVolumes, searchIssues, searchByCoverHash, searchCoversByHash, getIssue, matchByFilename, computePHash, matchIssueByCoverHash } from '/home/jo3l/www/sequent/backend/server/utils/localCvDb';

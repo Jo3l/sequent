@@ -14,7 +14,4 @@ export default defineNitroConfig({
   imports: {
     dirs: ["server/utils"],
   },
-  storage: {
-    cache: { driver: "fs", base: "./cache" },
-  },
 });

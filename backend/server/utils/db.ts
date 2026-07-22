@@ -4,22 +4,34 @@ import { resolve } from "node:path";
 
 let _db: Database.Database | null = null;
 
-function getDataDir(): string {
-  const cwd = process.cwd();
-  // Nitro dev: cwd = backend/
-  // Nitro prod: cwd = .output/
-  if (existsSync(resolve(cwd, "data"))) {
-    return resolve(cwd, "data");
+export function getDataDir(): string {
+  // Respect DATA_DIR env var (Docker: /data, local dev: not set)
+  if (process.env.DATA_DIR) {
+    const dir = resolve(process.env.DATA_DIR);
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+    return dir;
   }
-  const alt = resolve(cwd, "..", "data");
-  if (!existsSync(alt)) mkdirSync(alt, { recursive: true });
-  return alt;
+  const cwd = process.cwd();
+  // Nitro dev: cwd = backend/ → ../data = project root
+  // Nitro prod: cwd = .output/ → ../data = project root
+  const rootData = resolve(cwd, "..", "data");
+  if (!existsSync(rootData)) mkdirSync(rootData, { recursive: true });
+  return rootData;
+}
+
+/** Resolve a path relative to the data directory. */
+export function getDataPath(...segments: string[]): string {
+  const base = getDataDir();
+  if (segments.length === 0) return base;
+  const dir = resolve(base, ...segments);
+  const parent = resolve(dir, "..");
+  if (!existsSync(parent)) mkdirSync(parent, { recursive: true });
+  return dir;
 }
 
 export function getDb(): Database.Database {
   if (!_db) {
-    const dataDir = getDataDir();
-    const dbPath = resolve(dataDir, "comics.db");
+    const dbPath = getDataPath("comics.db");
     _db = new Database(dbPath);
     _db.pragma("journal_mode = WAL");
     _db.pragma("foreign_keys = ON");

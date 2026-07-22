@@ -8,6 +8,7 @@ import { parseFilename } from "../utils/filenameParser";
 import { matchByFilename, computePHash, matchIssueByCoverHash, getIssue, searchVolumes, sanitizeTitle } from "../utils/localCvDb";
 import type { CvIssue } from "../utils/localCvDb";
 import { slugify } from "../utils/slugify";
+import { getDataPath } from "../utils/db";
 
 function countPages(physicalPath: string): number {
   const archiveType = getArchiveType(physicalPath);
@@ -51,7 +52,7 @@ export default defineEventHandler(async (event) => {
     errors: [],
   };
 
-  const coversDir = resolve(process.cwd(), "covers");
+  const coversDir = getDataPath("covers");
   const { mkdirSync } = await import("node:fs");
   mkdirSync(coversDir, { recursive: true });
 
