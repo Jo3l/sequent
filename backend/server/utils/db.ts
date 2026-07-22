@@ -85,4 +85,14 @@ function initSchema(db: Database.Database): void {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Ensure default /comics local folder exists
+  const existing = db.prepare(
+    "SELECT id FROM library_folders WHERE type = 'local' AND path = '/comics'"
+  ).get();
+  if (!existing) {
+    db.prepare(
+      "INSERT INTO library_folders (path, label, type, active) VALUES ('/comics', 'Comics', 'local', 1)"
+    ).run();
+  }
 }

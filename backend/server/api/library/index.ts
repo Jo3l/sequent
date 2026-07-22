@@ -12,7 +12,11 @@ export default defineEventHandler(async (event) => {
 
   // GET — list all library folders
   if (method === "GET") {
-    const folders = db.prepare("SELECT * FROM library_folders ORDER BY created_at DESC").all();
+    const folders = db.prepare("SELECT * FROM library_folders ORDER BY created_at ASC").all() as any[];
+    // Mark the default /comics folder as protected
+    for (const f of folders) {
+      if (f.type === "local" && f.path === "/comics") f.protected = true;
+    }
     return { folders };
   }
 

@@ -103,7 +103,7 @@
     <div v-if="activeTab === 'libraries'" class="admin-section">
       <div class="section-header">
         <h3>Library Folders</h3>
-        <SButton variant="primary" size="sm" @click="showAddFolder = true">+ Add Folder</SButton>
+        <SButton variant="primary" size="sm" @click="showAddFolder = true">+ Añadir carpeta remota</SButton>
       </div>
 
       <table class="admin-table" v-if="folders.length > 0">
@@ -123,60 +123,50 @@
             <td><span class="type-badge" :class="f.type">{{ f.type }}</span></td>
             <td><span :class="f.active ? 'status-active' : 'status-inactive'">{{ f.active ? 'Active' : 'Inactive' }}</span></td>
             <td class="actions-cell">
-              <SButton size="sm" variant="ghost" @click="editFolder(f)">Edit</SButton>
-              <SButton size="sm" variant="danger" @click="deleteFolder(f)">Delete</SButton>
+              <SButton
+                v-if="!f.protected"
+                size="sm" variant="ghost"
+                @click="editFolder(f)"
+              >Edit</SButton>
+              <SButton
+                v-if="!f.protected"
+                size="sm" variant="danger"
+                @click="deleteFolder(f)"
+              >Delete</SButton>
             </td>
           </tr>
         </tbody>
       </table>
-      <p v-else class="empty-text">No library folders configured. Add comic directories to start scanning.</p>
+      <p v-else class="empty-text">No library folders configured.</p>
 
-      <!-- Add/Edit Folder Modal -->
+      <!-- Add/Edit Folder Modal — SMB only -->
       <div v-if="showAddFolder || editingFolder" class="modal-overlay" @click.self="closeFolderModal">
         <div class="modal">
-          <h3>{{ editingFolder ? 'Edit Folder' : 'Add Folder' }}</h3>
+          <h3>{{ editingFolder ? 'Edit Folder' : 'Añadir carpeta remota' }}</h3>
           <div class="field">
             <label>Label</label>
-            <input v-model="folderForm.label" type="text" placeholder="e.g., Main Library" />
+            <input v-model="folderForm.label" type="text" placeholder="e.g., NAS Comics" />
           </div>
           <div class="field">
-            <label>Type</label>
-            <select v-model="folderForm.type">
-              <option value="local">Local</option>
-              <option value="smb">SMB / Samba</option>
-              <option value="webdav">WebDAV</option>
-            </select>
+            <label>Host</label>
+            <input v-model="folderForm.smb_host" type="text" placeholder="192.168.1.100" />
           </div>
-
-          <template v-if="folderForm.type === 'local'">
-            <div class="field">
-              <label>Path</label>
-              <input v-model="folderForm.path" type="text" placeholder="/path/to/comics" />
-            </div>
-          </template>
-
-          <template v-if="folderForm.type === 'smb'">
-            <div class="field">
-              <label>Host</label>
-              <input v-model="folderForm.smb_host" type="text" placeholder="192.168.1.100" />
-            </div>
-            <div class="field">
-              <label>Share</label>
-              <input v-model="folderForm.smb_share" type="text" placeholder="comics" />
-            </div>
-            <div class="field">
-              <label>Username</label>
-              <input v-model="folderForm.smb_username" type="text" placeholder="username" />
-            </div>
-            <div class="field">
-              <label>Password</label>
-              <input v-model="folderForm.smb_password" type="password" placeholder="password" />
-            </div>
-            <div class="field">
-              <label>Domain (optional)</label>
-              <input v-model="folderForm.smb_domain" type="text" placeholder="WORKGROUP" />
-            </div>
-          </template>
+          <div class="field">
+            <label>Share</label>
+            <input v-model="folderForm.smb_share" type="text" placeholder="comics" />
+          </div>
+          <div class="field">
+            <label>Username</label>
+            <input v-model="folderForm.smb_username" type="text" placeholder="username" />
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input v-model="folderForm.smb_password" type="password" placeholder="password" />
+          </div>
+          <div class="field">
+            <label>Domain (optional)</label>
+            <input v-model="folderForm.smb_domain" type="text" placeholder="WORKGROUP" />
+          </div>
 
           <div class="field">
             <label>
@@ -189,7 +179,7 @@
           <div class="modal-actions">
             <SButton variant="ghost" @click="closeFolderModal">Cancel</SButton>
             <SButton variant="primary" @click="saveFolder" :loading="savingFolder">
-              {{ editingFolder ? 'Save' : 'Add Folder' }}
+              {{ editingFolder ? 'Save' : 'Añadir' }}
             </SButton>
           </div>
         </div>
@@ -346,7 +336,7 @@ const folders = ref<any[]>([]);
 const showAddFolder = ref(false);
 const editingFolder = ref<any>(null);
 const folderForm = ref({
-  path: "", label: "", type: "local",
+  path: "", label: "", type: "smb",
   smb_host: "", smb_share: "", smb_username: "", smb_password: "", smb_domain: "",
   active: true,
 });
@@ -374,7 +364,7 @@ function editFolder(f: any) {
 function closeFolderModal() {
   showAddFolder.value = false;
   editingFolder.value = null;
-  folderForm.value = { path: "", label: "", type: "local", smb_host: "", smb_share: "", smb_username: "", smb_password: "", smb_domain: "", active: true };
+  folderForm.value = { path: "", label: "", type: "smb", smb_host: "", smb_share: "", smb_username: "", smb_password: "", smb_domain: "", active: true };
   folderFormError.value = "";
 }
 
