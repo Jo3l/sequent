@@ -238,7 +238,7 @@ watch(() => props.visible, (v) => { if (v) load(); });
 watch(() => props.comicId, () => { if (props.visible) load(); });
 
 function preloadAdjacent(p: number) {
-  for (let i = p - 2; i <= p + 2; i++) {
+  for (let i = p - 2; i <= p + 5; i++) {
     if (i >= 1 && i <= pageCount.value && i !== p) {
       const img = new Image();
       img.src = pageUrl(i);
@@ -312,7 +312,7 @@ async function pageTurn(dir: 1 | -1) {
   await new Promise<void>(resolve => {
     cancelAnimationFrame(animId);
     const start = performance.now();
-    const duration = 500;
+    const duration = 375;
     function frame(now: number) {
       const t = Math.min((now - start) / duration, 1);
       animProgress.value = t;

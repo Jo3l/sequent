@@ -23,7 +23,8 @@ import consola from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/consola@3.
 import { ErrorParser } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/youch-core@0.3.3/node_modules/youch-core/build/index.js';
 import { Youch } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/youch@4.1.1/node_modules/youch/build/index.js';
 import { SourceMapConsumer } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/source-map@0.7.6/node_modules/source-map/source-map.js';
-import { existsSync, mkdirSync, promises, readFileSync, readdirSync, writeFileSync, unlinkSync, statSync } from 'node:fs';
+import { existsSync, mkdirSync, createWriteStream, promises, readFileSync, readdirSync, statSync, writeFileSync, appendFileSync, unlinkSync } from 'node:fs';
+import { get } from 'node:https';
 import { fileURLToPath } from 'node:url';
 import { dirname as dirname$1, resolve as resolve$1 } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/pathe@2.0.3/node_modules/pathe/dist/index.mjs';
 import { execSync, spawn } from 'node:child_process';
@@ -1031,23 +1032,92 @@ const _7uVHRI4YzlCEO4R_X0dFDDvt6O6vfifRmJQ1KxeG5Q = defineNitroPlugin(() => {
   console.log("\u2705 Database initialized");
 });
 
+const MODELS = [
+  {
+    name: "realesr-animevideov3-x2.bin",
+    url: "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3-x2.bin"
+  },
+  {
+    name: "realesr-animevideov3-x2.param",
+    url: "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesr-animevideov3-x2.param"
+  }
+];
+const _VB4HE6gVmZpoO2vhMo6bxgKi3fKLopnV4jYbiiRGLk = defineNitroPlugin(() => {
+  const modelsDir = getDataPath("models");
+  mkdirSync(modelsDir, { recursive: true });
+  const missing = MODELS.filter((m) => !existsSync(join(modelsDir, m.name)));
+  if (missing.length > 0) {
+    console.log(`\u2B07\uFE0F  Downloading ${missing.length} AI upscaling model(s)...`);
+    downloadModels(modelsDir, missing);
+  }
+});
+function downloadModels(dir, models) {
+  let remaining = models.length;
+  for (const model of models) {
+    const filePath = join(dir, model.name);
+    const file = createWriteStream(filePath);
+    get(model.url, (res) => {
+      if (res.statusCode === 302 || res.statusCode === 301) {
+        const redirectUrl = res.headers.location;
+        if (redirectUrl) {
+          file.close();
+          get(redirectUrl, (redirectRes) => {
+            redirectRes.pipe(createWriteStream(filePath));
+            redirectRes.on("end", () => markDone());
+          }).on("error", (err) => {
+            console.error(`\u274C Failed to download ${model.name}: ${err.message}`);
+            markDone();
+          });
+          return;
+        }
+      }
+      if (res.statusCode !== 200) {
+        console.error(`\u274C Failed to download ${model.name}: HTTP ${res.statusCode}`);
+        file.close();
+        markDone();
+        return;
+      }
+      res.pipe(file);
+      file.on("finish", () => {
+        file.close();
+        console.log(`\u2705 Downloaded ${model.name}`);
+        markDone();
+      });
+    }).on("error", (err) => {
+      console.error(`\u274C Failed to download ${model.name}: ${err.message}`);
+      try {
+        file.close();
+      } catch {
+      }
+      markDone();
+    });
+  }
+  function markDone() {
+    remaining--;
+    if (remaining === 0) {
+      console.log("\u2705 AI upscaling models ready");
+    }
+  }
+}
+
 const plugins = [
-  _7uVHRI4YzlCEO4R_X0dFDDvt6O6vfifRmJQ1KxeG5Q
+  _7uVHRI4YzlCEO4R_X0dFDDvt6O6vfifRmJQ1KxeG5Q,
+_VB4HE6gVmZpoO2vhMo6bxgKi3fKLopnV4jYbiiRGLk
 ];
 
 const assets = {
   "/index.mjs": {
     "type": "text/javascript; charset=utf-8",
-    "etag": "\"20020-HsnMW5p5m/KCkrQXmuhyymTaHzc\"",
-    "mtime": "2026-07-23T13:26:43.465Z",
-    "size": 131104,
+    "etag": "\"2093b-+L6BYuUBDLNZtfq0GvsMkVg7H9I\"",
+    "mtime": "2026-07-23T14:42:50.635Z",
+    "size": 133435,
     "path": "index.mjs"
   },
   "/index.mjs.map": {
     "type": "application/json",
-    "etag": "\"77c0a-QZQPT9KNHEK8Tpcl2jdiMZ1T+mM\"",
-    "mtime": "2026-07-23T13:26:43.465Z",
-    "size": 490506,
+    "etag": "\"79f29-pd2itKtO+XgrGwrtNaw9VxTaUg8\"",
+    "mtime": "2026-07-23T14:42:50.635Z",
+    "size": 499497,
     "path": "index.mjs.map"
   }
 };
@@ -1943,6 +2013,28 @@ function isEnhancing(comicId) {
 
 const MODEL_DIR = process.env.UPSCAYL_MODEL_DIR || getDataPath("models");
 const MODEL_NAME = "realesr-animevideov3-x2";
+let _logPath = null;
+const LOG_DIR = getDataPath("logs");
+function initLogger(comicId) {
+  mkdirSync(LOG_DIR, { recursive: true });
+  const ts = (/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-");
+  const logPath = join(LOG_DIR, `enhance-${comicId}-${ts}.log`);
+  writeFileSync(logPath, "", "utf-8");
+  _logPath = logPath;
+  return logPath;
+}
+function log(msg) {
+  const ts = (/* @__PURE__ */ new Date()).toISOString();
+  const line = `[${ts}] ${msg}
+`;
+  if (_logPath) {
+    try {
+      appendFileSync(_logPath, line, "utf-8");
+    } catch {
+    }
+  }
+  console.log(`[enhance] ${msg}`);
+}
 const enhance_post = defineEventHandler(async (event) => {
   const rawId = getRouterParam(event, "id");
   const id = parseInt(rawId || "", 10);
@@ -1980,34 +2072,55 @@ const enhance_post = defineEventHandler(async (event) => {
   return { success: true, jobId: job.jobId };
 });
 async function runEnhancement(comicId, physicalPath, comic) {
+  const logPath = initLogger(comicId);
   const workDir = join(tmpdir(), `sequent-enhance-${comicId}-${Date.now()}`);
   const extractedDir = join(workDir, "original");
   const enhancedDir = join(workDir, "enhanced");
+  log("=".repeat(60));
+  log(`ENHANCEMENT STARTED`);
+  log(`  Comic ID:    ${comicId}`);
+  log(`  File:        ${physicalPath}`);
+  log(`  Log:         ${logPath}`);
+  log(`  Temp dir:    ${workDir}`);
+  log(`  MODEL_DIR:   ${MODEL_DIR}`);
+  log(`  MODEL_NAME:  ${MODEL_NAME}`);
+  log(`  UPSCAYL_MODEL_DIR env: ${process.env.UPSCAYL_MODEL_DIR || "(not set)"}`);
+  log(`  PATH:        ${process.env.PATH || "(not set)"}`);
+  log("=".repeat(60));
   try {
     mkdirSync(extractedDir, { recursive: true });
     const flatDir = join(workDir, "flat");
     mkdirSync(flatDir, { recursive: true });
     mkdirSync(enhancedDir, { recursive: true });
+    log("\u2500\u2500 Phase 1: Extracting archive \u2500\u2500");
     updateEnhanceJob(comicId, { phase: "Extracting comic pages..." });
-    execSync(`unar -q -o "${extractedDir}" "${physicalPath}"`, {
-      stdio: "pipe",
-      timeout: 12e4
-    });
+    const extractCmd = `unar -q -o "${extractedDir}" "${physicalPath}"`;
+    log(`  Running: ${extractCmd}`);
+    const extractStart = Date.now();
+    execSync(extractCmd, { stdio: "pipe", timeout: 12e4 });
+    log(`  Extraction done in ${Date.now() - extractStart}ms`);
+    const findStart = Date.now();
     const allFiles = execSync(
       `find "${extractedDir}" -type f | LC_ALL=C sort`,
       { stdio: "pipe", encoding: "utf-8", timeout: 1e4 }
     ).trim().split("\n").filter(Boolean);
+    log(`  find returned ${allFiles.length} total files in ${Date.now() - findStart}ms`);
     const imageExts = /* @__PURE__ */ new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]);
     const imageFiles = allFiles.filter((f) => {
       const ext = f.slice(f.lastIndexOf(".")).toLowerCase();
       return imageExts.has(ext);
     });
+    log(`  Image files found: ${imageFiles.length}`);
+    log(`  Flattening to: ${flatDir}`);
+    const flattenStart = Date.now();
     imageFiles.forEach((src, i) => {
       const ext = src.slice(src.lastIndexOf("."));
       const dst = join(flatDir, `page_${String(i + 1).padStart(4, "0")}${ext}`);
       execSync(`cp "${src}" "${dst}"`, { stdio: "pipe", timeout: 5e3 });
     });
+    log(`  Flatten done in ${Date.now() - flattenStart}ms`);
     if (imageFiles.length === 0) {
+      log("  ERROR: No images found in comic archive");
       failEnhanceJob(comicId, "No images found in comic archive");
       return;
     }
@@ -2017,65 +2130,57 @@ async function runEnhancement(comicId, physicalPath, comic) {
       totalPages,
       currentPage: 1
     });
+    log("\u2500\u2500 Phase 2: AI Upscaling \u2500\u2500");
     updateEnhanceJob(comicId, { phase: "Running AI upscaling..." });
-    const upscaylResult = await new Promise((resolve2) => {
-      var _a;
-      const child = spawn("upscayl-bin", [
-        "-i",
-        flatDir,
-        "-o",
-        enhancedDir,
-        "-s",
-        "2",
-        "-f",
-        "webp",
-        "-c",
-        "85",
-        "-m",
-        MODEL_DIR,
-        "-n",
-        MODEL_NAME,
-        "-j",
-        "1:1:1",
-        "-v"
-      ], { stdio: "pipe", timeout: 6e5 });
-      const progressInterval = setInterval(() => {
-        const job = getEnhanceJob(comicId);
-        if (job && job.currentPage < totalPages) {
-          try {
-            const done = readdirSync(enhancedDir).filter((f) => f.endsWith(".webp")).length;
-            if (done > job.currentPage) {
-              updateEnhanceJob(comicId, {
-                currentPage: done,
-                phase: `Upscaling... ${done}/${totalPages}`
-              });
-            }
-          } catch {
-          }
-        }
-      }, 5e3);
-      let stderr = "";
-      (_a = child.stderr) == null ? void 0 : _a.on("data", (d) => {
-        stderr += d.toString();
+    const sourceFiles = readdirSync(flatDir).filter((f) => /\.(jpg|jpeg|png|webp|gif|bmp|tiff|tif)$/i.test(f)).sort((a, b) => a.localeCompare(b, void 0, { numeric: true }));
+    log(`  Source files to upscale: ${sourceFiles.length}`);
+    for (const sf of sourceFiles) {
+      const s = statSync(join(flatDir, sf));
+      log(`    ${sf}: ${s.size} bytes`);
+    }
+    let failedPages = 0;
+    const upscaleTotalStart = Date.now();
+    for (let i = 0; i < sourceFiles.length; i++) {
+      const srcFile = sourceFiles[i];
+      const srcPath = join(flatDir, srcFile);
+      const outName = `page_${String(i + 1).padStart(4, "0")}.webp`;
+      const outPath = join(enhancedDir, outName);
+      updateEnhanceJob(comicId, {
+        currentPage: i + 1,
+        phase: `Upscaling... ${i + 1}/${totalPages}`
       });
-      child.on("close", (code) => {
-        clearInterval(progressInterval);
-        resolve2({ success: code === 0, error: stderr || void 0 });
-      });
-      child.on("error", (err) => {
-        clearInterval(progressInterval);
-        resolve2({ success: false, error: err.message });
-      });
-    });
-    if (!upscaylResult.success) {
-      const enhancedFiles2 = readdirSync(enhancedDir).filter((f) => f.endsWith(".webp"));
-      if (enhancedFiles2.length === 0) {
-        failEnhanceJob(comicId, `Upscaling failed: ${upscaylResult.error || "unknown error"}`);
-        return;
+      const pageStart = Date.now();
+      log(`  -- Page ${i + 1}/${totalPages}: ${srcFile} -> ${outName} --`);
+      try {
+        await upscaleOne(srcPath, outPath);
+        const elapsed = Date.now() - pageStart;
+        const outSize = existsSync(outPath) ? statSync(outPath).size : 0;
+        log(`    OK Done in ${elapsed}ms, output: ${outSize} bytes`);
+      } catch (e) {
+        failedPages++;
+        const elapsed = Date.now() - pageStart;
+        log(`    FAILED after ${elapsed}ms: ${e.message}`);
+        updateEnhanceJob(comicId, {
+          phase: `Upscaling... ${i + 1}/${totalPages} (${failedPages} failed)`
+        });
       }
     }
+    const upscaleTotalElapsed = Date.now() - upscaleTotalStart;
+    log(`  Upscale phase done: ${failedPages}/${totalPages} failed, total time: ${upscaleTotalElapsed}ms`);
+    if (failedPages === totalPages) {
+      log("  ERROR: All pages failed to upscale");
+      failEnhanceJob(comicId, "All pages failed to upscale");
+      return;
+    }
+    log("\u2500\u2500 Phase 3: Verifying output \u2500\u2500");
     const enhancedFiles = readdirSync(enhancedDir).filter((f) => /\.(webp|png|jpg|jpeg)$/i.test(f)).sort((a, b) => a.localeCompare(b, void 0, { numeric: true }));
+    log(`  Enhanced files: ${enhancedFiles.length}`);
+    for (const ef of enhancedFiles) {
+      const s = statSync(join(enhancedDir, ef));
+      log(`    ${ef}: ${s.size} bytes`);
+    }
     if (enhancedFiles.length === 0) {
+      log("  ERROR: No enhanced images produced");
       failEnhanceJob(comicId, "No enhanced images produced");
       return;
     }
@@ -2083,6 +2188,7 @@ async function runEnhancement(comicId, physicalPath, comic) {
       currentPage: totalPages,
       phase: "Creating enhanced CBZ..."
     });
+    log("\u2500\u2500 Phase 4: Creating CBZ \u2500\u2500");
     const originalName = basename(physicalPath);
     const origExt = extname(originalName);
     const baseName = originalName.slice(0, -origExt.length);
@@ -2090,25 +2196,120 @@ async function runEnhancement(comicId, physicalPath, comic) {
     const comicsDir = resolve(getDataDir(), "..", "comics");
     mkdirSync(comicsDir, { recursive: true });
     const outputPath = join(comicsDir, enhancedCbzName);
+    log(`  Output: ${outputPath}`);
     const zipCmd = `cd "${enhancedDir}" && zip -q -0 "${outputPath}" *.webp *.png *.jpg *.jpeg 2>/dev/null`;
+    log(`  Running: ${zipCmd}`);
+    const zipStart = Date.now();
     execSync(zipCmd, { stdio: "pipe", timeout: 6e4 });
+    log(`  ZIP done in ${Date.now() - zipStart}ms`);
     if (!existsSync(outputPath)) {
+      log("  ERROR: Output CBZ not found after zip");
       failEnhanceJob(comicId, "Failed to create enhanced CBZ file");
       return;
     }
+    log(`  CBZ size: ${statSync(outputPath).size} bytes`);
     const downloadPath = `comics/${enhancedCbzName}`;
+    log("\u2500\u2500 Phase 5: Cleanup \u2500\u2500");
     try {
       execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
+      log(`  Removed temp dir: ${workDir}`);
     } catch {
+      log("  Warning: could not remove temp dir");
     }
+    log("=".repeat(60));
+    log(`ENHANCEMENT COMPLETED SUCCESSFULLY`);
+    log(`  Output: ${outputPath}`);
+    log(`  Pages:  ${enhancedFiles.length}`);
+    log("=".repeat(60));
     finishEnhanceJob(comicId, downloadPath, enhancedCbzName);
   } catch (e) {
+    log("=".repeat(60));
+    log(`ENHANCEMENT FAILED`);
+    log(`  Error: ${e.message}`);
+    if (e.stack) log(`  Stack: ${e.stack}`);
+    log("=".repeat(60));
     try {
       execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
     } catch {
     }
     failEnhanceJob(comicId, `Enhancement error: ${e.message}`);
   }
+}
+function upscaleOne(inputPath, outputPath) {
+  return new Promise((resolve2, reject) => {
+    var _a, _b;
+    const args = [
+      "-i",
+      inputPath,
+      "-o",
+      outputPath,
+      "-s",
+      "2",
+      "-f",
+      "webp",
+      "-c",
+      "85",
+      "-m",
+      MODEL_DIR,
+      "-n",
+      MODEL_NAME,
+      "-j",
+      "1:1:1"
+    ];
+    log(`    Command: upscayl-bin ${args.map((a) => a.includes(" ") ? `"${a}"` : a).join(" ")}`);
+    const whichResult = (() => {
+      try {
+        return execSync("which upscayl-bin", { stdio: "pipe", encoding: "utf-8", timeout: 3e3 }).trim();
+      } catch {
+        return "(not found in PATH)";
+      }
+    })();
+    log(`    Binary:  ${whichResult}`);
+    const child = spawn("upscayl-bin", args, {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    let stdout = "";
+    let stderr = "";
+    (_a = child.stdout) == null ? void 0 : _a.on("data", (d) => {
+      const text = d.toString();
+      stdout += text;
+      for (const line of text.split("\n").filter(Boolean)) {
+        log(`    [stdout] ${line}`);
+      }
+    });
+    (_b = child.stderr) == null ? void 0 : _b.on("data", (d) => {
+      const text = d.toString();
+      stderr += text;
+      for (const line of text.split("\n").filter(Boolean)) {
+        log(`    [stderr] ${line}`);
+      }
+    });
+    child.on("close", (code, signal) => {
+      log(`    Exit code: ${code}, signal: ${signal || "none"}`);
+      if (stdout.trim()) log(`    Full stdout: ${stdout.trim()}`);
+      if (stderr.trim()) log(`    Full stderr: ${stderr.trim()}`);
+      if (code === 0) {
+        try {
+          const s = statSync(outputPath);
+          if (s.size === 0) {
+            reject(new Error(`upscayl-bin produced empty file (0 bytes)`));
+          } else {
+            resolve2();
+          }
+        } catch {
+          reject(new Error(`upscayl-bin exited 0 but output file missing: ${outputPath}`));
+        }
+      } else {
+        reject(new Error(
+          stderr.trim() || `upscayl-bin exited with code ${code}${signal ? `, signal ${signal}` : ""}`
+        ));
+      }
+    });
+    child.on("error", (err) => {
+      log(`    Process error: ${err.message}`);
+      reject(err);
+    });
+  });
 }
 
 const enhance_post$1 = /*#__PURE__*/Object.freeze({
