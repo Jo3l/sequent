@@ -35,7 +35,8 @@ const props = defineProps<{
 
 const coverUrl = computed(() => {
   if (props.comic.cover_path) {
-    return `/api/covers/${props.comic.id}`;
+    const s = props.comic.slug || "";
+    return s ? `/api/covers/by-slug/${s}` : `/api/covers/${props.comic.id}`;
   }
   return "";
 });

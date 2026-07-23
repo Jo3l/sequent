@@ -1,9 +1,9 @@
 import { getDb, getDataPath } from "../../../../utils/db";
 import { getRouterParam } from "h3";
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { execSync } from "node:child_process";
-import { extractImageFromArchive, listArchiveImages, getArchiveType } from "../../../../utils/comicArchive";
+import { listArchiveImages, getArchiveType } from "../../../../utils/comicArchive";
 
 const CACHE_DIR = getDataPath("cache");
 const CACHE_TTL = 60 * 60 * 1000;
@@ -23,11 +23,7 @@ export default defineEventHandler(async (event) => {
 
   let physicalPath = comic.file_path;
   if (!physicalPath.startsWith("/")) {
-    const folders = db.prepare("SELECT path FROM library_folders WHERE active = 1").all() as any[];
-    for (const folder of folders) {
-      const candidate = join(folder.path, comic.file_path);
-      if (existsSync(candidate)) { physicalPath = candidate; break; }
-    }
+    physicalPath = resolve(getDataDir(), "..", physicalPath);
   }
 
   if (!existsSync(physicalPath)) {
@@ -53,11 +49,41 @@ function serveArchivePage(event: any, archivePath: string, comicId: number, page
     throw createError({ statusCode: 404, statusMessage: `Page ${pageNum} not found (total: ${images.length})` });
   }
 
-  const extracted = extractImageFromArchive(archivePath, images[idx], cacheDir);
-  if (!extracted) throw createError({ statusCode: 500, statusMessage: "Failed to extract page" });
+  // Cache file named by page number for fast lookup
+  const cacheFile = join(cacheDir, `page_${pageNum}.cache`);
 
-  const data = readFileSync(extracted);
-  const ext = extracted.split(".").pop()?.toLowerCase() || "jpeg";
+  if (!existsSync(cacheFile)) {
+    // Extract everything once into a flat temp dir, then grab the Nth image
+    const extractDir = join(cacheDir, "_extract");
+    if (!existsSync(extractDir) || readdirSync(extractDir).length === 0) {
+      try {
+        execSync(`unar -q -o "${extractDir}" "${archivePath}"`, {
+          stdio: "pipe", timeout: 120_000,
+        });
+      } catch { /* unar often exits non-zero */ }
+    }
+
+    const IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]);
+    const allFiles = execSync(
+      `find "${extractDir}" -type f | LC_ALL=C sort`,
+      { stdio: "pipe", encoding: "utf-8", timeout: 10_000 },
+    ).trim().split("\n").filter(Boolean);
+
+    const imageFiles = allFiles.filter(f => {
+      const ext = f.slice(f.lastIndexOf(".")).toLowerCase();
+      return IMAGE_EXTS.has(ext) && !f.endsWith("ComicInfo.xml");
+    });
+
+    if (idx >= imageFiles.length) {
+      throw createError({ statusCode: 404, statusMessage: `Page ${pageNum} not found` });
+    }
+
+    // Copy the specific image to its cache slot
+    execSync(`cp "${imageFiles[idx]}" "${cacheFile}"`, { stdio: "pipe", timeout: 5_000 });
+  }
+
+  const data = readFileSync(cacheFile);
+  const ext = cacheFile.split(".").slice(-2, -1)[0]?.toLowerCase() || "jpeg";
   setHeader(event, "Content-Type", getMimeType(ext));
   setHeader(event, "Cache-Control", "public, max-age=86400, immutable");
   return data;

@@ -1,38 +1,32 @@
-import { getDb } from "../utils/db";
+import { getDb, getDataDir, getDataPath } from "../utils/db";
 import { existsSync, statSync } from "node:fs";
 import { resolve, join, relative, extname } from "node:path";
 import { readdirSync } from "node:fs";
-import { isComicFile, getArchiveType, getComicInfo, extractFirstPageImage, listArchiveImages } from "../utils/comicArchive";
+import { isComicFile, getArchiveType, getComicInfo, extractFirstPageImage, listArchiveImages, countPdfPages } from "../utils/comicArchive";
 import { generateCover, coverPathFor, readCoverMetadata } from "../utils/comicCover";
 import { parseFilename } from "../utils/filenameParser";
 import { matchByFilename, computePHash, matchIssueByCoverHash, getIssue, searchVolumes, sanitizeTitle } from "../utils/localCvDb";
 import type { CvIssue } from "../utils/localCvDb";
 import { slugify } from "../utils/slugify";
-import { getDataPath } from "../utils/db";
+import { createJob, updateJob, finishJob, failJob, getJob } from "../utils/scanState";
+import type { ScanStats } from "../utils/scanState";
+import { mountSmbShare, unmountSmbShare } from "../utils/samba";
+import type { SmbMount } from "../utils/samba";
 
 function countPages(physicalPath: string): number {
   const archiveType = getArchiveType(physicalPath);
-  if (archiveType === "pdf") return 0;
+  if (archiveType === "pdf") return countPdfPages(physicalPath);
   const pages = listArchiveImages(physicalPath);
   return pages.length;
 }
 
-/** Generic issue names that shouldn't be used as comic titles. */
 function isGenericIssueName(name: string | null | undefined): boolean {
   if (!name) return true;
   const n = name.trim().toLowerCase();
   return /^(vol(?:ume)?\.?\s*\d+|tpb|collected\s*edition|hc|sc|gn|omnibus)$/i.test(n);
 }
-import { mountSmbShare, unmountSmbShare } from "../utils/samba";
-import type { SmbMount } from "../utils/samba";
 
-interface ScanStats {
-  foldersScanned: number;
-  filesFound: number;
-  newComics: number;
-  updatedComics: number;
-  errors: string[];
-}
+let jobCount = 0; // used to yield event loop during scan
 
 export default defineEventHandler(async (event) => {
   const db = getDb();
@@ -44,50 +38,70 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: "No library folders configured. Add one in admin settings." });
   }
 
-  const stats: ScanStats = {
-    foldersScanned: 0,
-    filesFound: 0,
-    newComics: 0,
-    updatedComics: 0,
-    errors: [],
-  };
+  // Create job and return immediately — scan runs in background
+  const jobId = `scan-${Date.now()}`;
+  createJob(jobId, library.length);
 
-  const coversDir = getDataPath("covers");
-  const { mkdirSync } = await import("node:fs");
-  mkdirSync(coversDir, { recursive: true });
+  // Run scan asynchronously after returning response, with a small delay
+  // so the event loop can process the status-polling requests
+  setTimeout(async () => {
+    // Yield once more so polling requests can get through before sync ops start
+    await new Promise(r => setTimeout(r, 50));
 
-  for (const folder of library) {
-    try {
-      let scanPath = folder.path;
+    const coversDir = getDataPath("covers");
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(coversDir, { recursive: true });
 
-      // Mount SMB shares if needed
-      if (folder.type === "smb" && folder.smb_host) {
-        try {
-          scanPath = mountSmbShare(folder);
-        } catch (e: any) {
-          stats.errors.push(`Failed to mount ${folder.label}: ${e.message}`);
+    for (let fi = 0; fi < library.length; fi++) {
+      const folder = library[fi];
+      updateJob({ folderIndex: fi, folderLabel: folder.label || folder.path });
+
+      try {
+        let scanPath: string = folder.path;
+
+        if (folder.type === "smb" && folder.smb_host) {
+          try {
+            scanPath = mountSmbShare(folder);
+          } catch (e: any) {
+            updateJob({ phase: `Error mounting ${folder.label}` });
+            const job = getJob();
+            if (job) job.stats.errors.push(`Failed to mount ${folder.label}: ${e.message}`);
+            continue;
+          }
+        }
+
+        if (folder.type === "local" && (scanPath.startsWith("./") || scanPath.startsWith("../"))) {
+          scanPath = resolve(getDataDir(), "..", scanPath);
+        }
+
+        if (!existsSync(scanPath)) {
+          updateJob({ phase: `Path not found: ${folder.label}` });
+          const job = getJob();
+          if (job) job.stats.errors.push(`Path not found: ${scanPath}`);
           continue;
         }
-      }
 
-      if (!existsSync(scanPath)) {
-        stats.errors.push(`Path not found: ${scanPath}`);
-        continue;
-      }
+        await scanDirectory(scanPath, folder.path, db, coversDir, force);
 
-      await scanDirectory(scanPath, folder.path, db, coversDir, stats, force);
-      stats.foldersScanned++;
+        const job = getJob();
+        if (job) {
+          job.stats.foldersScanned++;
+          updateJob({ stats: { ...job.stats } });
+        }
 
-      // Unmount SMB shares after scan
-      if (folder.type === "smb") {
-        unmountSmbShare(folder);
+        if (folder.type === "smb") {
+          unmountSmbShare(folder);
+        }
+      } catch (e: any) {
+        const job = getJob();
+        if (job) job.stats.errors.push(`Error scanning ${folder.label}: ${e.message}`);
       }
-    } catch (e: any) {
-      stats.errors.push(`Error scanning ${folder.label}: ${e.message}`);
     }
-  }
 
-  return { success: true, stats };
+    finishJob();
+  });
+
+  return { success: true, jobId };
 });
 
 async function scanDirectory(
@@ -95,7 +109,6 @@ async function scanDirectory(
   logicalPath: string,
   db: ReturnType<typeof getDb>,
   coversDir: string,
-  stats: ScanStats,
   force: boolean,
 ): Promise<void> {
   try {
@@ -106,26 +119,34 @@ async function scanDirectory(
       const fullLogical = join(logicalPath, entry.name);
 
       if (entry.isDirectory()) {
-        await scanDirectory(fullPhysical, fullLogical, db, coversDir, stats, force);
+        await scanDirectory(fullPhysical, fullLogical, db, coversDir, force);
         continue;
       }
 
       if (!isComicFile(entry.name)) continue;
 
-      stats.filesFound++;
+      updateJob({ phase: `Processing ${entry.name}` });
+
+      // Yield to event loop every few files so status polling works
+      if (jobCount++ % 3 === 0) {
+        await new Promise(r => setTimeout(r, 0));
+      }
+
+      const job = getJob();
+      if (job) {
+        job.stats.filesFound++;
+        updateJob({ stats: { ...job.stats } });
+      }
 
       try {
         const stat = statSync(fullPhysical);
 
-        // Skip if cover already exists alongside the comic (cached with XMP metadata)
         const coverFile = coverPathFor(fullPhysical);
         if (!force && existsSync(coverFile)) {
-          // Ensure DB has this comic tracked
           const existing = db.prepare("SELECT id FROM comics WHERE file_path = ?").get(fullLogical) as any;
           if (!existing) {
-            // New comic with pre-existing cover — insert minimal record
             const pageCount = countPages(fullPhysical);
-            const meta = readCoverMetadata(coverFile);
+            const meta = await readCoverMetadata(coverFile);
             const parsed = parseFilename(entry.name);
             db.prepare(`
               INSERT INTO comics (file_path, file_name, cover_path, title, issue_number,
@@ -140,20 +161,22 @@ async function scanDirectory(
               pageCount,
               JSON.stringify(meta || {}),
               slugify(meta?.title || parsed.title, meta?.number || parsed.issueNumber));
-            stats.newComics++;
+            const j = getJob();
+            if (j) { j.stats.newComics++; updateJob({ stats: { ...j.stats } }); }
           }
           continue;
         }
 
         const existing = db.prepare("SELECT id, cover_path, updated_at FROM comics WHERE file_path = ?").get(fullLogical) as any;
-
-        await processComic(fullPhysical, fullLogical, db, coversDir, existing?.id, stats);
+        await processComic(fullPhysical, fullLogical, db, coversDir, existing?.id);
       } catch (e: any) {
-        stats.errors.push(`Error processing ${entry.name}: ${e.message}`);
+        const job = getJob();
+        if (job) job.stats.errors.push(`Error processing ${entry.name}: ${e.message}`);
       }
     }
   } catch (e: any) {
-    stats.errors.push(`Cannot read directory: ${e.message}`);
+    const job = getJob();
+    if (job) job.stats.errors.push(`Cannot read directory: ${e.message}`);
   }
 }
 
@@ -163,7 +186,6 @@ async function processComic(
   db: ReturnType<typeof getDb>,
   coversDir: string,
   existingId: number | undefined,
-  stats: ScanStats,
 ): Promise<void> {
   const fileName = physicalPath.split("/").pop() || logicalPath;
   const parsed = parseFilename(fileName);
@@ -185,10 +207,11 @@ async function processComic(
 
   // Extract cover — for new comics, insert first to get real ID, then generate cover
   let coverPath = "";
-  const coverBuffer = extractFirstPageImage(physicalPath);
+  let coverBuffer: Buffer | null = null;
+
+  coverBuffer = extractFirstPageImage(physicalPath);
   let isNew = false;
 
-  // For NEW comics: insert first, get real ID, then generate cover
   if (!existingId) {
     const pageCount = countPages(physicalPath);
     const result = db.prepare(`
@@ -205,6 +228,7 @@ async function processComic(
 
   if (coverBuffer) {
     const coverFile = coverPathFor(physicalPath);
+    updateJob({ phase: `Generating cover for ${fileName}` });
     const success = await generateCover(coverBuffer, {
       title: metadata.title || parsed.title,
       series: metadata.title || parsed.title,
@@ -218,17 +242,13 @@ async function processComic(
     if (success) coverPath = coverFile;
   }
 
-  // Enrich metadata from local CV DB (filename + cover hash across all issues)
+  // Enrich metadata from local CV DB
   const cvResult = matchByFilename(parsed.title, parsed.issueNumber, parsed.year);
 
-  // If we have matching volumes AND a cover, try hash matching across ALL their issues.
-  // This catches cases where the file is named #1 but the cover matches issue #0.
   let hashIssue: CvIssue | null = null;
   if (coverBuffer && cvResult) {
     try {
       const phash = await computePHash(coverBuffer);
-      // Get the volume IDs from the matched volumes (via cvResult's issue volume_id)
-      // But we need ALL candidate volume IDs. Use the same scoring as matchByFilename.
       const volumes = searchVolumes(parsed.title);
       if (volumes.length > 0) {
         const scored = volumes
@@ -263,7 +283,6 @@ async function processComic(
   }
 
   if (hashIssue) {
-    // Hash match found — use it (more reliable than filename-based issue number)
     metadata = {
       title: metadata.title || hashIssue.volume_name || parsed.title,
       issue_number: hashIssue.issue_number || metadata.issue_number || parsed.issueNumber,
@@ -283,7 +302,6 @@ async function processComic(
       cv_match_method: "hash",
     };
   } else if (cvResult) {
-    // No hash match — use filename-based match
     const i = cvResult.issue;
     const cvTitle = i.volume_name || (isGenericIssueName(i.name) ? "" : i.name);
     metadata = {
@@ -306,15 +324,15 @@ async function processComic(
     };
   }
 
-  // Get page count
   const archiveType = getArchiveType(physicalPath);
   let pageCount = 0;
-  if (archiveType !== "pdf") {
+  if (archiveType === "pdf") {
+    pageCount = countPdfPages(physicalPath);
+  } else {
     const pages = listArchiveImages(physicalPath);
     pageCount = pages.length;
   }
 
-  // Update with full metadata and cover path (for both new and existing)
   const metadataJson = JSON.stringify(metadata);
   const slug = slugify(metadata.title || parsed.title, metadata.issue_number || parsed.issueNumber);
   db.prepare(`
@@ -327,6 +345,11 @@ async function processComic(
     metadata.issue_number || parsed.issueNumber, metadata.volume || parsed.volume || "",
     metadata.year || parsed.year || "", metadata.publisher || "",
     pageCount, metadataJson, slug, existingId);
-  if (isNew) stats.newComics++;
-  else stats.updatedComics++;
+
+  const job = getJob();
+  if (job) {
+    if (isNew) job.stats.newComics++;
+    else job.stats.updatedComics++;
+    updateJob({ stats: { ...job.stats } });
+  }
 }

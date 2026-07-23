@@ -7,7 +7,7 @@ declare module "h3" {
   }
 }
 
-const PUBLIC_PREFIXES = ["/api/auth/login", "/api/auth/setup", "/api/auth/logout", "/api/health", "/api/covers/"];
+const PUBLIC_PREFIXES = ["/api/auth/login", "/api/auth/setup", "/api/auth/logout", "/api/health", "/api/covers/", "/api/scan/status"];
 
 export default defineEventHandler(async (event) => {
   const path = event.path;

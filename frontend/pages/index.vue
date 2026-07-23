@@ -15,7 +15,7 @@
           variant="default"
           size="sm"
           @click="triggerScan"
-          :loading="scanning"
+          :loading="scanState.active"
         >
           🔄 Scan Library
         </SButton>
@@ -38,12 +38,12 @@ import { useAuth } from "~/composables/useAuth";
 
 const { apiFetch } = useApi();
 const auth = useAuth();
+const { scanState, triggerScan } = useScan();
 const comics = ref<any[]>([]);
 const loading = ref(true);
 const page = ref(1);
 const totalPages = ref(0);
 const search = ref("");
-const scanning = ref(false);
 
 let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -76,14 +76,10 @@ function debouncedSearch() {
   }, 300);
 }
 
-async function triggerScan() {
-  scanning.value = true;
-  try {
-    await apiFetch("/api/scan", { method: "POST" });
-    await fetchComics();
-  } catch { /* ignore */ }
-  scanning.value = false;
-}
+// Refresh comic list when scan completes
+watch(() => scanState.value.status, (status) => {
+  if (status === "completed") fetchComics();
+});
 
 onMounted(async () => {
   await fetchComics();

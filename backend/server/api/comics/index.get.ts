@@ -1,4 +1,6 @@
-import { getDb } from "../../utils/db";
+import { getDb, getDataDir } from "../../utils/db";
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event);
@@ -39,11 +41,28 @@ export default defineEventHandler(async (event) => {
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
 
-  const comics = rows.map((row: any) => ({
-    ...row,
-    metadata: safeJsonParse(row.metadata_json),
-    metadata_json: undefined,
-  }));
+  const staleDelete = db.prepare("DELETE FROM comics WHERE id = ?");
+  const dataDir = getDataDir();
+
+  const comics = rows
+    .map((row: any) => {
+      // Resolve physical path and check file exists
+      let physicalPath: string = row.file_path;
+      if (!physicalPath.startsWith("/")) {
+        physicalPath = resolve(dataDir, "..", physicalPath);
+      }
+      if (!existsSync(physicalPath)) {
+        // Stale record — file deleted from disk, remove from DB
+        staleDelete.run(row.id);
+        return null;
+      }
+      return {
+        ...row,
+        metadata: safeJsonParse(row.metadata_json),
+        metadata_json: undefined,
+      };
+    })
+    .filter(Boolean);
 
   return {
     comics,

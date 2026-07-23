@@ -1,7 +1,7 @@
 import process from 'node:process';globalThis._importMeta_={url:import.meta.url,env:process.env};import { tmpdir } from 'node:os';
 import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, createError, sendRedirect, proxyRequest, getRequestURL, getRequestHeader, getResponseHeader, getRequestHeaders, setResponseHeaders, setResponseStatus, send, removeResponseHeader, appendResponseHeader, setResponseHeader, getCookie, getHeader, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getRouterParam, readBody, getQuery as getQuery$1, deleteCookie, setHeader, getMethod } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/h3@1.15.11/node_modules/h3/dist/index.mjs';
 import { Server } from 'node:http';
-import { resolve, dirname, join, extname } from 'node:path';
+import { resolve, dirname, join, basename, extname } from 'node:path';
 import nodeCrypto, { createHash } from 'node:crypto';
 import { parentPort, threadId } from 'node:worker_threads';
 import { jwtVerify, SignJWT } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/jose@5.10.0/node_modules/jose/dist/node/esm/index.js';
@@ -23,10 +23,10 @@ import consola from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/consola@3.
 import { ErrorParser } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/youch-core@0.3.3/node_modules/youch-core/build/index.js';
 import { Youch } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/youch@4.1.1/node_modules/youch/build/index.js';
 import { SourceMapConsumer } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/source-map@0.7.6/node_modules/source-map/source-map.js';
-import { existsSync, mkdirSync, promises, readFileSync, writeFileSync, unlinkSync, statSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, promises, readFileSync, readdirSync, writeFileSync, unlinkSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname as dirname$1, resolve as resolve$1 } from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/pathe@2.0.3/node_modules/pathe/dist/index.mjs';
-import { execSync } from 'node:child_process';
+import { execSync, spawn } from 'node:child_process';
 import Database from 'file:///home/jo3l/www/sequent/node_modules/.pnpm/better-sqlite3@11.10.0/node_modules/better-sqlite3/lib/index.js';
 
 const serverAssets = [{"baseName":"server","dir":"/home/jo3l/www/sequent/backend/server/assets"}];
@@ -987,6 +987,7 @@ function initSchema(db) {
       year TEXT DEFAULT '',
       publisher TEXT DEFAULT '',
       page_count INTEGER DEFAULT 0,
+      slug TEXT DEFAULT '',
       metadata_json TEXT DEFAULT '{}',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -1011,14 +1012,17 @@ function initSchema(db) {
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
-  const defaultPath = process.env.COMICS_DIR || "../comics";
+  try {
+    db.exec("ALTER TABLE comics ADD COLUMN slug TEXT DEFAULT ''");
+  } catch {
+  }
   const existing = db.prepare(
-    "SELECT id FROM library_folders WHERE type = 'local' AND path = ?"
-  ).get(defaultPath);
+    "SELECT id FROM library_folders WHERE type = 'local' AND path = './comics'"
+  ).get();
   if (!existing) {
     db.prepare(
-      "INSERT INTO library_folders (path, label, type, active) VALUES (?, 'Comics', 'local', 1)"
-    ).run(defaultPath);
+      "INSERT INTO library_folders (path, label, type, active) VALUES ('./comics', 'Comics', 'local', 1)"
+    ).run();
   }
 }
 
@@ -1034,16 +1038,16 @@ const plugins = [
 const assets = {
   "/index.mjs": {
     "type": "text/javascript; charset=utf-8",
-    "etag": "\"1cc47-n9rRlAxSaw/gObSw1gNRd88g/9g\"",
-    "mtime": "2026-07-22T20:54:30.197Z",
-    "size": 117831,
+    "etag": "\"20020-HsnMW5p5m/KCkrQXmuhyymTaHzc\"",
+    "mtime": "2026-07-23T13:26:43.465Z",
+    "size": 131104,
     "path": "index.mjs"
   },
   "/index.mjs.map": {
     "type": "application/json",
-    "etag": "\"6b8c8-CI1oa7VDy3ouRd5W9iXhgxbRkQo\"",
-    "mtime": "2026-07-22T20:54:30.197Z",
-    "size": 440520,
+    "etag": "\"77c0a-QZQPT9KNHEK8Tpcl2jdiMZ1T+mM\"",
+    "mtime": "2026-07-23T13:26:43.465Z",
+    "size": 490506,
     "path": "index.mjs.map"
   }
 };
@@ -1151,7 +1155,7 @@ async function verifyToken(token) {
   }
 }
 
-const PUBLIC_PREFIXES = ["/api/auth/login", "/api/auth/setup", "/api/auth/logout", "/api/health", "/api/covers/"];
+const PUBLIC_PREFIXES = ["/api/auth/login", "/api/auth/setup", "/api/auth/logout", "/api/health", "/api/covers/", "/api/scan/status"];
 const _685Hes = defineEventHandler(async (event) => {
   const path = event.path;
   for (const prefix of PUBLIC_PREFIXES) {
@@ -1181,15 +1185,19 @@ const _lazy_XuRYHu = () => Promise.resolve().then(function () { return password_
 const _lazy_jCSBOL = () => Promise.resolve().then(function () { return setup_get$1; });
 const _lazy_iJhIs3 = () => Promise.resolve().then(function () { return setup_post$1; });
 const _lazy_XmgsFS = () => Promise.resolve().then(function () { return _id_$5; });
+const _lazy_NWOMBu = () => Promise.resolve().then(function () { return enhance_post$1; });
+const _lazy_Ir4RYz = () => Promise.resolve().then(function () { return status_get$3; });
 const _lazy_VW37JE = () => Promise.resolve().then(function () { return match_post$1; });
 const _lazy_qcCfk5 = () => Promise.resolve().then(function () { return _page__get$1; });
 const _lazy_eI4fmk = () => Promise.resolve().then(function () { return suggestions_get$1; });
 const _lazy_bUr7jW = () => Promise.resolve().then(function () { return index_get$3; });
 const _lazy_3OwK9t = () => Promise.resolve().then(function () { return _id__get$1; });
+const _lazy_mqraOZ = () => Promise.resolve().then(function () { return _slug__get$1; });
 const _lazy_2sj5QS = () => Promise.resolve().then(function () { return health_get$1; });
 const _lazy_h6TUPC = () => Promise.resolve().then(function () { return _id_$3; });
 const _lazy_0Wcp55 = () => Promise.resolve().then(function () { return index$3; });
 const _lazy_Toe1g1 = () => Promise.resolve().then(function () { return scan_post$1; });
+const _lazy_Kt7o_d = () => Promise.resolve().then(function () { return status_get$1; });
 const _lazy_CkpopA = () => Promise.resolve().then(function () { return index$1; });
 const _lazy_k1JNzC = () => Promise.resolve().then(function () { return _id_$1; });
 const _lazy_a1W4iO = () => Promise.resolve().then(function () { return index_get$1; });
@@ -1205,15 +1213,19 @@ const handlers = [
   { route: '/api/auth/setup', handler: _lazy_jCSBOL, lazy: true, middleware: false, method: "get" },
   { route: '/api/auth/setup', handler: _lazy_iJhIs3, lazy: true, middleware: false, method: "post" },
   { route: '/api/comics/:id', handler: _lazy_XmgsFS, lazy: true, middleware: false, method: undefined },
+  { route: '/api/comics/:id/enhance', handler: _lazy_NWOMBu, lazy: true, middleware: false, method: "post" },
+  { route: '/api/comics/:id/enhance/status', handler: _lazy_Ir4RYz, lazy: true, middleware: false, method: "get" },
   { route: '/api/comics/:id/match', handler: _lazy_VW37JE, lazy: true, middleware: false, method: "post" },
   { route: '/api/comics/:id/pages/:page', handler: _lazy_qcCfk5, lazy: true, middleware: false, method: "get" },
   { route: '/api/comics/:id/suggestions', handler: _lazy_eI4fmk, lazy: true, middleware: false, method: "get" },
   { route: '/api/comics', handler: _lazy_bUr7jW, lazy: true, middleware: false, method: "get" },
   { route: '/api/covers/:id', handler: _lazy_3OwK9t, lazy: true, middleware: false, method: "get" },
+  { route: '/api/covers/by-slug/:slug', handler: _lazy_mqraOZ, lazy: true, middleware: false, method: "get" },
   { route: '/api/health', handler: _lazy_2sj5QS, lazy: true, middleware: false, method: "get" },
   { route: '/api/library/:id', handler: _lazy_h6TUPC, lazy: true, middleware: false, method: undefined },
   { route: '/api/library', handler: _lazy_0Wcp55, lazy: true, middleware: false, method: undefined },
   { route: '/api/scan', handler: _lazy_Toe1g1, lazy: true, middleware: false, method: "post" },
+  { route: '/api/scan/status', handler: _lazy_Kt7o_d, lazy: true, middleware: false, method: "get" },
   { route: '/api/settings', handler: _lazy_CkpopA, lazy: true, middleware: false, method: undefined },
   { route: '/api/users/:id', handler: _lazy_k1JNzC, lazy: true, middleware: false, method: undefined },
   { route: '/api/users', handler: _lazy_a1W4iO, lazy: true, middleware: false, method: "get" },
@@ -1630,18 +1642,506 @@ const _id_$4 = defineEventHandler(async (event) => {
   if (!row) {
     throw createError({ statusCode: 404, statusMessage: "Comic not found" });
   }
+  const dir = dirname(row.file_path);
+  const siblings = db.prepare(
+    "SELECT id, file_name FROM comics WHERE file_path LIKE ? ORDER BY file_name COLLATE NOCASE ASC"
+  ).all(dir + "/%");
+  let nextId = null;
+  let prevId = null;
+  for (let i = 0; i < siblings.length; i++) {
+    if (siblings[i].id === id) {
+      if (i > 0) prevId = siblings[i - 1].id;
+      if (i < siblings.length - 1) nextId = siblings[i + 1].id;
+      break;
+    }
+  }
   return {
     comic: {
       ...row,
       metadata: JSON.parse(row.metadata_json || "{}"),
       metadata_json: void 0
-    }
+    },
+    nextId,
+    prevId
   };
 });
 
 const _id_$5 = /*#__PURE__*/Object.freeze({
   __proto__: null,
   default: _id_$4
+});
+
+const IMAGE_EXTS = /* @__PURE__ */ new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]);
+function getArchiveType(filePath) {
+  var _a;
+  const ext = ((_a = filePath.split(".").pop()) == null ? void 0 : _a.toLowerCase()) || "";
+  if (ext === "cbz" || ext === "zip") return "cbz";
+  if (ext === "cbr" || ext === "rar") return "cbr";
+  if (ext === "pdf") return "pdf";
+  if (ext === "cbt" || ext === "tar") return "cbr";
+  return "unknown";
+}
+function isComicFile(filePath) {
+  var _a;
+  const ext = ((_a = filePath.split(".").pop()) == null ? void 0 : _a.toLowerCase()) || "";
+  return ["cbz", "cbr", "cbt", "pdf", "zip", "rar"].includes(ext);
+}
+function countPdfPages(pdfPath) {
+  try {
+    const out = execSync(`pdfinfo "${pdfPath}"`, { stdio: "pipe", encoding: "utf-8", timeout: 1e4 });
+    const match = out.match(/^Pages:\s+(\d+)/m);
+    return match ? parseInt(match[1], 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+function extractComicInfoXml(archivePath) {
+  const workDir = join(tmpdir(), `sequent-ci-${Date.now()}`);
+  try {
+    mkdirSync(workDir, { recursive: true });
+    try {
+      execSync(`unar -q -o "${workDir}" "${archivePath}" "ComicInfo.xml"`, {
+        stdio: "pipe",
+        timeout: 15e3
+      });
+    } catch {
+    }
+    const xmlPath = join(workDir, "ComicInfo.xml");
+    if (existsSync(xmlPath)) return readFileSync(xmlPath, "utf-8");
+    try {
+      execSync(`unar -q -o "${workDir}" "${archivePath}"`, {
+        stdio: "pipe",
+        timeout: 6e4
+      });
+    } catch {
+    }
+    const findOut = execSync(
+      `find "${workDir}" -iname "ComicInfo.xml" -type f 2>/dev/null | head -1`,
+      { stdio: "pipe", encoding: "utf-8", timeout: 5e3 }
+    );
+    const foundPath = findOut.trim();
+    if (foundPath && existsSync(foundPath)) return readFileSync(foundPath, "utf-8");
+    return null;
+  } catch {
+    return null;
+  } finally {
+    try {
+      if (existsSync(workDir)) execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
+    } catch {
+    }
+  }
+}
+async function parseComicInfoXml(xml) {
+  const { XMLParser } = await import('file:///home/jo3l/www/sequent/node_modules/.pnpm/fast-xml-parser@4.5.7/node_modules/fast-xml-parser/src/fxp.js');
+  const parser = new XMLParser({
+    ignoreAttributes: false,
+    attributeNamePrefix: "@_",
+    textNodeName: "#text",
+    trimValues: true,
+    parseTagValue: false
+  });
+  const parsed = parser.parse(xml);
+  const root = parsed == null ? void 0 : parsed.ComicInfo;
+  if (!root || typeof root !== "object") return {};
+  function str(val) {
+    if (val === null || val === void 0) return void 0;
+    return String(val).trim() || void 0;
+  }
+  return {
+    title: str(root.Title),
+    series: str(root.Series),
+    number: str(root.Number),
+    volume: str(root.Volume),
+    summary: str(root.Summary),
+    year: str(root.Year),
+    month: str(root.Month),
+    day: str(root.Day),
+    writer: str(root.Writer),
+    penciller: str(root.Penciller),
+    inker: str(root.Inker),
+    colorist: str(root.Colorist),
+    letterer: str(root.Letterer),
+    cover_artist: str(root.CoverArtist),
+    editor: str(root.Editor),
+    publisher: str(root.Publisher),
+    imprint: str(root.Imprint),
+    format: str(root.Format),
+    age_rating: str(root.AgeRating),
+    page_count: str(root.PageCount),
+    genre: str(root.Genre),
+    characters: str(root.Characters),
+    teams: str(root.Teams),
+    locations: str(root.Locations),
+    series_group: str(root.SeriesGroup),
+    story_arc: str(root.StoryArc),
+    web: str(root.Web),
+    language_iso: str(root.LanguageISO),
+    community_rating: str(root.CommunityRating),
+    count: str(root.Count),
+    scan_information: str(root.ScanInformation)
+  };
+}
+async function getComicInfo(archivePath) {
+  const xml = extractComicInfoXml(archivePath);
+  if (!xml) return null;
+  return parseComicInfoXml(xml);
+}
+function extractFirstPageImage(archivePath) {
+  const ext = archivePath.slice(archivePath.lastIndexOf(".")).toLowerCase();
+  if (ext === ".pdf") {
+    return extractPdfFirstPage(archivePath);
+  }
+  return extractArchiveFirstImage(archivePath);
+}
+function extractPdfFirstPage(pdfPath) {
+  const workDir = join(tmpdir(), `sequent-pdf-cover-${Date.now()}`);
+  try {
+    mkdirSync(workDir, { recursive: true });
+    execSync(`pdftoppm -f 1 -l 1 -r 200 -png "${pdfPath}" "${workDir}/cover"`, {
+      stdio: "pipe",
+      timeout: 15e3
+    });
+    const generated = join(workDir, "cover-1.png");
+    if (existsSync(generated)) return readFileSync(generated);
+    return null;
+  } catch {
+    return null;
+  } finally {
+    try {
+      execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
+    } catch {
+    }
+  }
+}
+function extractArchiveFirstImage(archivePath) {
+  const workDir = join(tmpdir(), `sequent-cover-${Date.now()}`);
+  try {
+    mkdirSync(workDir, { recursive: true });
+    const lsarOut = execSync(`lsar -j "${archivePath}"`, {
+      stdio: "pipe",
+      encoding: "utf-8",
+      timeout: 1e4
+    });
+    const listing = JSON.parse(lsarOut);
+    const entries = (listing == null ? void 0 : listing.lsarContents) || [];
+    let firstImage = null;
+    for (const entry of entries) {
+      const fileName = entry.XADFileName || entry.name || entry.filename;
+      if (!fileName || fileName === "ComicInfo.xml") continue;
+      const ext = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
+      if (IMAGE_EXTS.has(ext)) {
+        firstImage = fileName;
+        break;
+      }
+    }
+    if (!firstImage) return null;
+    try {
+      execSync(`unar -q -o "${workDir}" "${archivePath}" "${firstImage}"`, {
+        stdio: "pipe",
+        timeout: 15e3
+      });
+    } catch {
+    }
+    let found = findFile(workDir);
+    if (found) return readFileSync(found);
+    try {
+      execSync(`unar -q -o "${workDir}" "${archivePath}"`, {
+        stdio: "pipe",
+        timeout: 6e4
+      });
+    } catch {
+    }
+    found = findFile(workDir);
+    if (!found) return null;
+    return readFileSync(found);
+  } catch {
+    return null;
+  } finally {
+    try {
+      if (existsSync(workDir)) execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
+    } catch {
+    }
+  }
+}
+function findFile(dir) {
+  const out = execSync(`find "${dir}" -type f 2>/dev/null | LC_ALL=C sort | head -1`, {
+    stdio: "pipe",
+    encoding: "utf-8",
+    timeout: 5e3
+  });
+  const path = out.trim();
+  return path && existsSync(path) ? path : null;
+}
+function listArchiveImages(archivePath) {
+  try {
+    const lsarOut = execSync(`lsar -j "${archivePath}"`, {
+      stdio: "pipe",
+      encoding: "utf-8",
+      timeout: 1e4
+    });
+    const listing = JSON.parse(lsarOut);
+    const entries = (listing == null ? void 0 : listing.lsarContents) || [];
+    return entries.filter((e) => {
+      const fn = e.XADFileName || e.name || e.filename || "";
+      if (fn === "ComicInfo.xml") return false;
+      const ext = fn.slice(fn.lastIndexOf(".")).toLowerCase();
+      return IMAGE_EXTS.has(ext);
+    }).map((e) => e.XADFileName || e.name || e.filename || "").sort((a, b) => a.localeCompare(b, void 0, { numeric: true }));
+  } catch {
+    return [];
+  }
+}
+
+const jobs = /* @__PURE__ */ new Map();
+function createEnhanceJob(comicId) {
+  const job = {
+    jobId: `enhance-${comicId}-${Date.now()}`,
+    comicId,
+    status: "running",
+    startedAt: Date.now(),
+    phase: "Starting...",
+    currentPage: 0,
+    totalPages: 0,
+    progressPct: 0
+  };
+  jobs.set(comicId, job);
+  return job;
+}
+function getEnhanceJob(comicId) {
+  var _a;
+  return (_a = jobs.get(comicId)) != null ? _a : null;
+}
+function updateEnhanceJob(comicId, patch) {
+  const job = jobs.get(comicId);
+  if (job) {
+    Object.assign(job, patch);
+    if (job.totalPages > 0) {
+      job.progressPct = Math.round(job.currentPage / job.totalPages * 100);
+    }
+  }
+}
+function finishEnhanceJob(comicId, downloadPath, downloadName) {
+  const job = jobs.get(comicId);
+  if (job) {
+    job.status = "completed";
+    job.downloadPath = downloadPath;
+    job.downloadName = downloadName;
+    job.progressPct = 100;
+  }
+}
+function failEnhanceJob(comicId, error) {
+  const job = jobs.get(comicId);
+  if (job) {
+    job.status = "error";
+    job.error = error;
+  }
+}
+function isEnhancing(comicId) {
+  const job = jobs.get(comicId);
+  return (job == null ? void 0 : job.status) === "running";
+}
+
+const MODEL_DIR = process.env.UPSCAYL_MODEL_DIR || getDataPath("models");
+const MODEL_NAME = "realesr-animevideov3-x2";
+const enhance_post = defineEventHandler(async (event) => {
+  const rawId = getRouterParam(event, "id");
+  const id = parseInt(rawId || "", 10);
+  if (isNaN(id)) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid comic ID" });
+  }
+  const db = getDb();
+  const comic = db.prepare("SELECT * FROM comics WHERE id = ?").get(id);
+  if (!comic) {
+    throw createError({ statusCode: 404, statusMessage: "Comic not found" });
+  }
+  if (isEnhancing(id)) {
+    const existing = getEnhanceJob(id);
+    throw createError({
+      statusCode: 409,
+      statusMessage: (existing == null ? void 0 : existing.status) === "running" ? "Enhancement already in progress" : "Already enhanced or previously attempted"
+    });
+  }
+  let physicalPath = comic.file_path;
+  if (!physicalPath.startsWith("/")) {
+    physicalPath = resolve(getDataDir(), "..", physicalPath);
+  }
+  if (!existsSync(physicalPath)) {
+    throw createError({ statusCode: 404, statusMessage: "Comic file not found on disk" });
+  }
+  const archiveType = getArchiveType(physicalPath);
+  if (archiveType === "pdf") {
+    throw createError({ statusCode: 400, statusMessage: "PDF enhancement is not yet supported" });
+  }
+  const job = createEnhanceJob(id);
+  setTimeout(async () => {
+    await new Promise((r) => setTimeout(r, 50));
+    await runEnhancement(id, physicalPath);
+  });
+  return { success: true, jobId: job.jobId };
+});
+async function runEnhancement(comicId, physicalPath, comic) {
+  const workDir = join(tmpdir(), `sequent-enhance-${comicId}-${Date.now()}`);
+  const extractedDir = join(workDir, "original");
+  const enhancedDir = join(workDir, "enhanced");
+  try {
+    mkdirSync(extractedDir, { recursive: true });
+    const flatDir = join(workDir, "flat");
+    mkdirSync(flatDir, { recursive: true });
+    mkdirSync(enhancedDir, { recursive: true });
+    updateEnhanceJob(comicId, { phase: "Extracting comic pages..." });
+    execSync(`unar -q -o "${extractedDir}" "${physicalPath}"`, {
+      stdio: "pipe",
+      timeout: 12e4
+    });
+    const allFiles = execSync(
+      `find "${extractedDir}" -type f | LC_ALL=C sort`,
+      { stdio: "pipe", encoding: "utf-8", timeout: 1e4 }
+    ).trim().split("\n").filter(Boolean);
+    const imageExts = /* @__PURE__ */ new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]);
+    const imageFiles = allFiles.filter((f) => {
+      const ext = f.slice(f.lastIndexOf(".")).toLowerCase();
+      return imageExts.has(ext);
+    });
+    imageFiles.forEach((src, i) => {
+      const ext = src.slice(src.lastIndexOf("."));
+      const dst = join(flatDir, `page_${String(i + 1).padStart(4, "0")}${ext}`);
+      execSync(`cp "${src}" "${dst}"`, { stdio: "pipe", timeout: 5e3 });
+    });
+    if (imageFiles.length === 0) {
+      failEnhanceJob(comicId, "No images found in comic archive");
+      return;
+    }
+    const totalPages = imageFiles.length;
+    updateEnhanceJob(comicId, {
+      phase: "Upscaling images with AI...",
+      totalPages,
+      currentPage: 1
+    });
+    updateEnhanceJob(comicId, { phase: "Running AI upscaling..." });
+    const upscaylResult = await new Promise((resolve2) => {
+      var _a;
+      const child = spawn("upscayl-bin", [
+        "-i",
+        flatDir,
+        "-o",
+        enhancedDir,
+        "-s",
+        "2",
+        "-f",
+        "webp",
+        "-c",
+        "85",
+        "-m",
+        MODEL_DIR,
+        "-n",
+        MODEL_NAME,
+        "-j",
+        "1:1:1",
+        "-v"
+      ], { stdio: "pipe", timeout: 6e5 });
+      const progressInterval = setInterval(() => {
+        const job = getEnhanceJob(comicId);
+        if (job && job.currentPage < totalPages) {
+          try {
+            const done = readdirSync(enhancedDir).filter((f) => f.endsWith(".webp")).length;
+            if (done > job.currentPage) {
+              updateEnhanceJob(comicId, {
+                currentPage: done,
+                phase: `Upscaling... ${done}/${totalPages}`
+              });
+            }
+          } catch {
+          }
+        }
+      }, 5e3);
+      let stderr = "";
+      (_a = child.stderr) == null ? void 0 : _a.on("data", (d) => {
+        stderr += d.toString();
+      });
+      child.on("close", (code) => {
+        clearInterval(progressInterval);
+        resolve2({ success: code === 0, error: stderr || void 0 });
+      });
+      child.on("error", (err) => {
+        clearInterval(progressInterval);
+        resolve2({ success: false, error: err.message });
+      });
+    });
+    if (!upscaylResult.success) {
+      const enhancedFiles2 = readdirSync(enhancedDir).filter((f) => f.endsWith(".webp"));
+      if (enhancedFiles2.length === 0) {
+        failEnhanceJob(comicId, `Upscaling failed: ${upscaylResult.error || "unknown error"}`);
+        return;
+      }
+    }
+    const enhancedFiles = readdirSync(enhancedDir).filter((f) => /\.(webp|png|jpg|jpeg)$/i.test(f)).sort((a, b) => a.localeCompare(b, void 0, { numeric: true }));
+    if (enhancedFiles.length === 0) {
+      failEnhanceJob(comicId, "No enhanced images produced");
+      return;
+    }
+    updateEnhanceJob(comicId, {
+      currentPage: totalPages,
+      phase: "Creating enhanced CBZ..."
+    });
+    const originalName = basename(physicalPath);
+    const origExt = extname(originalName);
+    const baseName = originalName.slice(0, -origExt.length);
+    const enhancedCbzName = `${baseName}-enhanced-ai.cbz`;
+    const comicsDir = resolve(getDataDir(), "..", "comics");
+    mkdirSync(comicsDir, { recursive: true });
+    const outputPath = join(comicsDir, enhancedCbzName);
+    const zipCmd = `cd "${enhancedDir}" && zip -q -0 "${outputPath}" *.webp *.png *.jpg *.jpeg 2>/dev/null`;
+    execSync(zipCmd, { stdio: "pipe", timeout: 6e4 });
+    if (!existsSync(outputPath)) {
+      failEnhanceJob(comicId, "Failed to create enhanced CBZ file");
+      return;
+    }
+    const downloadPath = `comics/${enhancedCbzName}`;
+    try {
+      execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
+    } catch {
+    }
+    finishEnhanceJob(comicId, downloadPath, enhancedCbzName);
+  } catch (e) {
+    try {
+      execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
+    } catch {
+    }
+    failEnhanceJob(comicId, `Enhancement error: ${e.message}`);
+  }
+}
+
+const enhance_post$1 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  default: enhance_post
+});
+
+const status_get$2 = defineEventHandler(async (event) => {
+  const rawId = getRouterParam(event, "id");
+  const id = parseInt(rawId || "", 10);
+  if (isNaN(id)) {
+    throw createError({ statusCode: 400, statusMessage: "Invalid comic ID" });
+  }
+  const job = getEnhanceJob(id);
+  if (!job) {
+    return { active: false };
+  }
+  return {
+    active: job.status === "running",
+    status: job.status,
+    phase: job.phase,
+    currentPage: job.currentPage,
+    totalPages: job.totalPages,
+    progressPct: job.progressPct,
+    error: job.error,
+    downloadPath: job.downloadPath,
+    downloadName: job.downloadName
+  };
+});
+
+const status_get$3 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  default: status_get$2
 });
 
 function getDefaultDbPath() {
@@ -1945,261 +2445,6 @@ const match_post$1 = /*#__PURE__*/Object.freeze({
   default: match_post
 });
 
-const IMAGE_EXTS = /* @__PURE__ */ new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]);
-function getArchiveType(filePath) {
-  var _a;
-  const ext = ((_a = filePath.split(".").pop()) == null ? void 0 : _a.toLowerCase()) || "";
-  if (ext === "cbz" || ext === "zip") return "cbz";
-  if (ext === "cbr" || ext === "rar") return "cbr";
-  if (ext === "pdf") return "pdf";
-  if (ext === "cbt" || ext === "tar") return "cbr";
-  return "unknown";
-}
-function isComicFile(filePath) {
-  var _a;
-  const ext = ((_a = filePath.split(".").pop()) == null ? void 0 : _a.toLowerCase()) || "";
-  return ["cbz", "cbr", "cbt", "pdf", "zip", "rar"].includes(ext);
-}
-function extractComicInfoXml(archivePath) {
-  const workDir = join(tmpdir(), `sequent-ci-${Date.now()}`);
-  try {
-    mkdirSync(workDir, { recursive: true });
-    try {
-      execSync(`unar -q -o "${workDir}" "${archivePath}" "ComicInfo.xml"`, {
-        stdio: "pipe",
-        timeout: 15e3
-      });
-    } catch {
-    }
-    const xmlPath = join(workDir, "ComicInfo.xml");
-    if (existsSync(xmlPath)) return readFileSync(xmlPath, "utf-8");
-    try {
-      execSync(`unar -q -o "${workDir}" "${archivePath}"`, {
-        stdio: "pipe",
-        timeout: 6e4
-      });
-    } catch {
-    }
-    const findOut = execSync(
-      `find "${workDir}" -iname "ComicInfo.xml" -type f 2>/dev/null | head -1`,
-      { stdio: "pipe", encoding: "utf-8", timeout: 5e3 }
-    );
-    const foundPath = findOut.trim();
-    if (foundPath && existsSync(foundPath)) return readFileSync(foundPath, "utf-8");
-    return null;
-  } catch {
-    return null;
-  } finally {
-    try {
-      if (existsSync(workDir)) execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
-    } catch {
-    }
-  }
-}
-async function parseComicInfoXml(xml) {
-  const { XMLParser } = await import('file:///home/jo3l/www/sequent/node_modules/.pnpm/fast-xml-parser@4.5.7/node_modules/fast-xml-parser/src/fxp.js');
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: "@_",
-    textNodeName: "#text",
-    trimValues: true,
-    parseTagValue: false
-  });
-  const parsed = parser.parse(xml);
-  const root = parsed == null ? void 0 : parsed.ComicInfo;
-  if (!root || typeof root !== "object") return {};
-  function str(val) {
-    if (val === null || val === void 0) return void 0;
-    return String(val).trim() || void 0;
-  }
-  return {
-    title: str(root.Title),
-    series: str(root.Series),
-    number: str(root.Number),
-    volume: str(root.Volume),
-    summary: str(root.Summary),
-    year: str(root.Year),
-    month: str(root.Month),
-    day: str(root.Day),
-    writer: str(root.Writer),
-    penciller: str(root.Penciller),
-    inker: str(root.Inker),
-    colorist: str(root.Colorist),
-    letterer: str(root.Letterer),
-    cover_artist: str(root.CoverArtist),
-    editor: str(root.Editor),
-    publisher: str(root.Publisher),
-    imprint: str(root.Imprint),
-    format: str(root.Format),
-    age_rating: str(root.AgeRating),
-    page_count: str(root.PageCount),
-    genre: str(root.Genre),
-    characters: str(root.Characters),
-    teams: str(root.Teams),
-    locations: str(root.Locations),
-    series_group: str(root.SeriesGroup),
-    story_arc: str(root.StoryArc),
-    web: str(root.Web),
-    language_iso: str(root.LanguageISO),
-    community_rating: str(root.CommunityRating),
-    count: str(root.Count),
-    scan_information: str(root.ScanInformation)
-  };
-}
-async function getComicInfo(archivePath) {
-  const xml = extractComicInfoXml(archivePath);
-  if (!xml) return null;
-  return parseComicInfoXml(xml);
-}
-function extractFirstPageImage(archivePath) {
-  const ext = archivePath.slice(archivePath.lastIndexOf(".")).toLowerCase();
-  if (ext === ".pdf") {
-    return extractPdfFirstPage(archivePath);
-  }
-  return extractArchiveFirstImage(archivePath);
-}
-function extractPdfFirstPage(pdfPath) {
-  const workDir = join(tmpdir(), `sequent-pdf-cover-${Date.now()}`);
-  try {
-    mkdirSync(workDir, { recursive: true });
-    execSync(`pdftoppm -f 1 -l 1 -r 200 -png "${pdfPath}" "${workDir}/cover"`, {
-      stdio: "pipe",
-      timeout: 15e3
-    });
-    const generated = join(workDir, "cover-1.png");
-    if (existsSync(generated)) return readFileSync(generated);
-    return null;
-  } catch {
-    return null;
-  } finally {
-    try {
-      execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
-    } catch {
-    }
-  }
-}
-function extractArchiveFirstImage(archivePath) {
-  const workDir = join(tmpdir(), `sequent-cover-${Date.now()}`);
-  try {
-    mkdirSync(workDir, { recursive: true });
-    const lsarOut = execSync(`lsar -j "${archivePath}"`, {
-      stdio: "pipe",
-      encoding: "utf-8",
-      timeout: 1e4
-    });
-    const listing = JSON.parse(lsarOut);
-    const entries = (listing == null ? void 0 : listing.lsarContents) || [];
-    let firstImage = null;
-    for (const entry of entries) {
-      const fileName = entry.XADFileName || entry.name || entry.filename;
-      if (!fileName || fileName === "ComicInfo.xml") continue;
-      const ext = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
-      if (IMAGE_EXTS.has(ext)) {
-        firstImage = fileName;
-        break;
-      }
-    }
-    if (!firstImage) return null;
-    try {
-      execSync(`unar -q -o "${workDir}" "${archivePath}" "${firstImage}"`, {
-        stdio: "pipe",
-        timeout: 15e3
-      });
-    } catch {
-    }
-    let found = findFile(workDir);
-    if (found) return readFileSync(found);
-    try {
-      execSync(`unar -q -o "${workDir}" "${archivePath}"`, {
-        stdio: "pipe",
-        timeout: 6e4
-      });
-    } catch {
-    }
-    found = findFile(workDir);
-    if (!found) return null;
-    return readFileSync(found);
-  } catch {
-    return null;
-  } finally {
-    try {
-      if (existsSync(workDir)) execSync(`rm -rf "${workDir}"`, { stdio: "pipe" });
-    } catch {
-    }
-  }
-}
-function findFile(dir) {
-  const out = execSync(`find "${dir}" -type f 2>/dev/null | LC_ALL=C sort | head -1`, {
-    stdio: "pipe",
-    encoding: "utf-8",
-    timeout: 5e3
-  });
-  const path = out.trim();
-  return path && existsSync(path) ? path : null;
-}
-function listArchiveImages(archivePath) {
-  try {
-    const lsarOut = execSync(`lsar -j "${archivePath}"`, {
-      stdio: "pipe",
-      encoding: "utf-8",
-      timeout: 1e4
-    });
-    const listing = JSON.parse(lsarOut);
-    const entries = (listing == null ? void 0 : listing.lsarContents) || [];
-    return entries.filter((e) => {
-      const fn = e.XADFileName || e.name || e.filename || "";
-      if (fn === "ComicInfo.xml") return false;
-      const ext = fn.slice(fn.lastIndexOf(".")).toLowerCase();
-      return IMAGE_EXTS.has(ext);
-    }).map((e) => e.XADFileName || e.name || e.filename || "").sort((a, b) => a.localeCompare(b, void 0, { numeric: true }));
-  } catch {
-    return [];
-  }
-}
-function extractImageFromArchive(archivePath, imageName, destDir) {
-  const destPath = join(destDir, imageName.replace(/\//g, "_"));
-  if (existsSync(destPath)) return destPath;
-  try {
-    mkdirSync(destDir, { recursive: true });
-    try {
-      execSync(`unar -q -o "${destDir}" "${archivePath}" "${imageName}"`, {
-        stdio: "pipe",
-        timeout: 15e3
-      });
-    } catch {
-    }
-    if (existsSync(destPath)) return destPath;
-    const found = findFile(destDir);
-    if (found) {
-      try {
-        execSync(`mv "${found}" "${destPath}"`, { stdio: "pipe" });
-      } catch {
-        return found;
-      }
-      return destPath;
-    }
-    try {
-      execSync(`unar -q -o "${destDir}" "${archivePath}"`, {
-        stdio: "pipe",
-        timeout: 6e4
-      });
-    } catch {
-    }
-    const found2 = findFile(destDir);
-    if (found2) {
-      try {
-        execSync(`mv "${found2}" "${destPath}"`, { stdio: "pipe" });
-      } catch {
-        return found2;
-      }
-      return destPath;
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 const CACHE_DIR = getDataPath("cache");
 const CACHE_TTL = 60 * 60 * 1e3;
 const _page__get = defineEventHandler(async (event) => {
@@ -2214,14 +2459,7 @@ const _page__get = defineEventHandler(async (event) => {
   if (!comic) throw createError({ statusCode: 404, statusMessage: "Comic not found" });
   let physicalPath = comic.file_path;
   if (!physicalPath.startsWith("/")) {
-    const folders = db.prepare("SELECT path FROM library_folders WHERE active = 1").all();
-    for (const folder of folders) {
-      const candidate = join(folder.path, comic.file_path);
-      if (existsSync(candidate)) {
-        physicalPath = candidate;
-        break;
-      }
-    }
+    physicalPath = resolve(getDataDir(), "..", physicalPath);
   }
   if (!existsSync(physicalPath)) {
     throw createError({ statusCode: 404, statusMessage: "Comic file not found on disk" });
@@ -2242,10 +2480,34 @@ function serveArchivePage(event, archivePath, comicId, pageNum) {
   if (idx < 0 || idx >= images.length) {
     throw createError({ statusCode: 404, statusMessage: `Page ${pageNum} not found (total: ${images.length})` });
   }
-  const extracted = extractImageFromArchive(archivePath, images[idx], cacheDir);
-  if (!extracted) throw createError({ statusCode: 500, statusMessage: "Failed to extract page" });
-  const data = readFileSync(extracted);
-  const ext = ((_a = extracted.split(".").pop()) == null ? void 0 : _a.toLowerCase()) || "jpeg";
+  const cacheFile = join(cacheDir, `page_${pageNum}.cache`);
+  if (!existsSync(cacheFile)) {
+    const extractDir = join(cacheDir, "_extract");
+    if (!existsSync(extractDir) || readdirSync(extractDir).length === 0) {
+      try {
+        execSync(`unar -q -o "${extractDir}" "${archivePath}"`, {
+          stdio: "pipe",
+          timeout: 12e4
+        });
+      } catch {
+      }
+    }
+    const IMAGE_EXTS = /* @__PURE__ */ new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tiff", ".tif"]);
+    const allFiles = execSync(
+      `find "${extractDir}" -type f | LC_ALL=C sort`,
+      { stdio: "pipe", encoding: "utf-8", timeout: 1e4 }
+    ).trim().split("\n").filter(Boolean);
+    const imageFiles = allFiles.filter((f) => {
+      const ext2 = f.slice(f.lastIndexOf(".")).toLowerCase();
+      return IMAGE_EXTS.has(ext2) && !f.endsWith("ComicInfo.xml");
+    });
+    if (idx >= imageFiles.length) {
+      throw createError({ statusCode: 404, statusMessage: `Page ${pageNum} not found` });
+    }
+    execSync(`cp "${imageFiles[idx]}" "${cacheFile}"`, { stdio: "pipe", timeout: 5e3 });
+  }
+  const data = readFileSync(cacheFile);
+  const ext = ((_a = cacheFile.split(".").slice(-2, -1)[0]) == null ? void 0 : _a.toLowerCase()) || "jpeg";
   setHeader(event, "Content-Type", getMimeType(ext));
   setHeader(event, "Cache-Control", "public, max-age=86400, immutable");
   return data;
@@ -2293,8 +2555,8 @@ function getMimeType(ext) {
 function cleanStaleCache(cacheDir) {
   try {
     const now = Date.now();
-    const { readdirSync } = require("node:fs");
-    for (const entry of readdirSync(cacheDir, { withFileTypes: true })) {
+    const { readdirSync: readdirSync2 } = require("node:fs");
+    for (const entry of readdirSync2(cacheDir, { withFileTypes: true })) {
       if (!entry.isFile()) continue;
       const full = join(cacheDir, entry.name);
       try {
@@ -2516,11 +2778,23 @@ const index_get$2 = defineEventHandler(async (event) => {
     ORDER BY ${sortCol} DESC
     LIMIT ? OFFSET ?
   `).all(...params, limit, offset);
-  const comics = rows.map((row) => ({
-    ...row,
-    metadata: safeJsonParse(row.metadata_json),
-    metadata_json: void 0
-  }));
+  const staleDelete = db.prepare("DELETE FROM comics WHERE id = ?");
+  const dataDir = getDataDir();
+  const comics = rows.map((row) => {
+    let physicalPath = row.file_path;
+    if (!physicalPath.startsWith("/")) {
+      physicalPath = resolve(dataDir, "..", physicalPath);
+    }
+    if (!existsSync(physicalPath)) {
+      staleDelete.run(row.id);
+      return null;
+    }
+    return {
+      ...row,
+      metadata: safeJsonParse(row.metadata_json),
+      metadata_json: void 0
+    };
+  }).filter(Boolean);
   return {
     comics,
     pagination: {
@@ -2574,6 +2848,29 @@ const _id__get = defineEventHandler(async (event) => {
 const _id__get$1 = /*#__PURE__*/Object.freeze({
   __proto__: null,
   default: _id__get
+});
+
+const _slug__get = defineEventHandler(async (event) => {
+  const slug = getRouterParam(event, "slug");
+  if (!slug) throw createError({ statusCode: 400, statusMessage: "Missing slug" });
+  const db = getDb();
+  const row = db.prepare("SELECT cover_path FROM comics WHERE slug = ?").get(slug);
+  if (!(row == null ? void 0 : row.cover_path)) {
+    throw createError({ statusCode: 404, statusMessage: "Cover not found" });
+  }
+  const coverPath = row.cover_path;
+  if (!existsSync(coverPath)) {
+    throw createError({ statusCode: 404, statusMessage: "Cover file missing" });
+  }
+  const ct = coverPath.endsWith(".webp") ? "image/webp" : coverPath.endsWith(".png") ? "image/png" : "image/jpeg";
+  setHeader(event, "Content-Type", ct);
+  setHeader(event, "Cache-Control", "public, max-age=31536000, immutable");
+  return readFileSync(coverPath);
+});
+
+const _slug__get$1 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  default: _slug__get
 });
 
 const health_get = defineEventHandler(() => {
@@ -2696,8 +2993,7 @@ const _id_$2 = defineEventHandler(async (event) => {
   if (method === "DELETE") {
     const folder = db.prepare("SELECT * FROM library_folders WHERE id = ?").get(id);
     if (!folder) throw createError({ statusCode: 404, statusMessage: "Folder not found" });
-    const defaultPath = process.env.COMICS_DIR || "../comics";
-    if (folder.type === "local" && folder.path === defaultPath) {
+    if (folder.type === "local" && folder.path === "./comics") {
       throw createError({ statusCode: 403, statusMessage: "The default Comics folder cannot be deleted" });
     }
     db.prepare("DELETE FROM library_folders WHERE id = ?").run(id);
@@ -2740,9 +3036,8 @@ const index$2 = defineEventHandler(async (event) => {
   const method = getMethod(event);
   if (method === "GET") {
     const folders = db.prepare("SELECT * FROM library_folders ORDER BY created_at ASC").all();
-    const defaultPath = process.env.COMICS_DIR || "../comics";
     for (const f of folders) {
-      if (f.type === "local" && f.path === defaultPath) f.protected = true;
+      if (f.type === "local" && f.path === "./comics") f.protected = true;
     }
     return { folders };
   }
@@ -2893,9 +3188,39 @@ async function readCoverMetadata(coverPath) {
   }
 }
 
+let currentJob = null;
+function createJob(jobId, totalFolders) {
+  currentJob = {
+    jobId,
+    status: "running",
+    startedAt: Date.now(),
+    phase: "Starting scan...",
+    stats: {
+      foldersScanned: 0,
+      filesFound: 0,
+      newComics: 0,
+      updatedComics: 0,
+      errors: []
+    },
+    totalFolders,
+    folderIndex: 0,
+    folderLabel: ""
+  };
+  return currentJob;
+}
+function getJob() {
+  return currentJob;
+}
+function updateJob(patch) {
+  if (currentJob) Object.assign(currentJob, patch);
+}
+function finishJob() {
+  if (currentJob) currentJob.status = "completed";
+}
+
 function countPages(physicalPath) {
   const archiveType = getArchiveType(physicalPath);
-  if (archiveType === "pdf") return 0;
+  if (archiveType === "pdf") return countPdfPages(physicalPath);
   const pages = listArchiveImages(physicalPath);
   return pages.length;
 }
@@ -2904,6 +3229,7 @@ function isGenericIssueName(name) {
   const n = name.trim().toLowerCase();
   return /^(vol(?:ume)?\.?\s*\d+|tpb|collected\s*edition|hc|sc|gn|omnibus)$/i.test(n);
 }
+let jobCount = 0;
 const scan_post = defineEventHandler(async (event) => {
   const db = getDb();
   const query = getQuery$1(event);
@@ -2912,54 +3238,75 @@ const scan_post = defineEventHandler(async (event) => {
   if (library.length === 0) {
     throw createError({ statusCode: 400, statusMessage: "No library folders configured. Add one in admin settings." });
   }
-  const stats = {
-    foldersScanned: 0,
-    filesFound: 0,
-    newComics: 0,
-    updatedComics: 0,
-    errors: []
-  };
-  const coversDir = getDataPath("covers");
-  const { mkdirSync } = await import('node:fs');
-  mkdirSync(coversDir, { recursive: true });
-  for (const folder of library) {
-    try {
-      let scanPath = folder.path;
-      if (folder.type === "smb" && folder.smb_host) {
-        try {
-          scanPath = mountSmbShare(folder);
-        } catch (e) {
-          stats.errors.push(`Failed to mount ${folder.label}: ${e.message}`);
+  const jobId = `scan-${Date.now()}`;
+  createJob(jobId, library.length);
+  setTimeout(async () => {
+    await new Promise((r) => setTimeout(r, 50));
+    const coversDir = getDataPath("covers");
+    const { mkdirSync } = await import('node:fs');
+    mkdirSync(coversDir, { recursive: true });
+    for (let fi = 0; fi < library.length; fi++) {
+      const folder = library[fi];
+      updateJob({ folderIndex: fi, folderLabel: folder.label || folder.path });
+      try {
+        let scanPath = folder.path;
+        if (folder.type === "smb" && folder.smb_host) {
+          try {
+            scanPath = mountSmbShare(folder);
+          } catch (e) {
+            updateJob({ phase: `Error mounting ${folder.label}` });
+            const job2 = getJob();
+            if (job2) job2.stats.errors.push(`Failed to mount ${folder.label}: ${e.message}`);
+            continue;
+          }
+        }
+        if (folder.type === "local" && (scanPath.startsWith("./") || scanPath.startsWith("../"))) {
+          scanPath = resolve(getDataDir(), "..", scanPath);
+        }
+        if (!existsSync(scanPath)) {
+          updateJob({ phase: `Path not found: ${folder.label}` });
+          const job2 = getJob();
+          if (job2) job2.stats.errors.push(`Path not found: ${scanPath}`);
           continue;
         }
+        await scanDirectory(scanPath, folder.path, db, coversDir, force);
+        const job = getJob();
+        if (job) {
+          job.stats.foldersScanned++;
+          updateJob({ stats: { ...job.stats } });
+        }
+        if (folder.type === "smb") {
+          unmountSmbShare(folder);
+        }
+      } catch (e) {
+        const job = getJob();
+        if (job) job.stats.errors.push(`Error scanning ${folder.label}: ${e.message}`);
       }
-      if (!existsSync(scanPath)) {
-        stats.errors.push(`Path not found: ${scanPath}`);
-        continue;
-      }
-      await scanDirectory(scanPath, folder.path, db, coversDir, stats, force);
-      stats.foldersScanned++;
-      if (folder.type === "smb") {
-        unmountSmbShare(folder);
-      }
-    } catch (e) {
-      stats.errors.push(`Error scanning ${folder.label}: ${e.message}`);
     }
-  }
-  return { success: true, stats };
+    finishJob();
+  });
+  return { success: true, jobId };
 });
-async function scanDirectory(physicalPath, logicalPath, db, coversDir, stats, force) {
+async function scanDirectory(physicalPath, logicalPath, db, coversDir, force) {
   try {
     const entries = readdirSync(physicalPath, { withFileTypes: true });
     for (const entry of entries) {
       const fullPhysical = join(physicalPath, entry.name);
       const fullLogical = join(logicalPath, entry.name);
       if (entry.isDirectory()) {
-        await scanDirectory(fullPhysical, fullLogical, db, coversDir, stats, force);
+        await scanDirectory(fullPhysical, fullLogical, db, coversDir, force);
         continue;
       }
       if (!isComicFile(entry.name)) continue;
-      stats.filesFound++;
+      updateJob({ phase: `Processing ${entry.name}` });
+      if (jobCount++ % 3 === 0) {
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      const job = getJob();
+      if (job) {
+        job.stats.filesFound++;
+        updateJob({ stats: { ...job.stats } });
+      }
       try {
         const stat = statSync(fullPhysical);
         const coverFile = coverPathFor(fullPhysical);
@@ -2967,7 +3314,7 @@ async function scanDirectory(physicalPath, logicalPath, db, coversDir, stats, fo
           const existing2 = db.prepare("SELECT id FROM comics WHERE file_path = ?").get(fullLogical);
           if (!existing2) {
             const pageCount = countPages(fullPhysical);
-            const meta = readCoverMetadata(coverFile);
+            const meta = await readCoverMetadata(coverFile);
             const parsed = parseFilename(entry.name);
             db.prepare(`
               INSERT INTO comics (file_path, file_name, cover_path, title, issue_number,
@@ -2986,21 +3333,27 @@ async function scanDirectory(physicalPath, logicalPath, db, coversDir, stats, fo
               JSON.stringify(meta || {}),
               slugify((meta == null ? void 0 : meta.title) || parsed.title, (meta == null ? void 0 : meta.number) || parsed.issueNumber)
             );
-            stats.newComics++;
+            const j = getJob();
+            if (j) {
+              j.stats.newComics++;
+              updateJob({ stats: { ...j.stats } });
+            }
           }
           continue;
         }
         const existing = db.prepare("SELECT id, cover_path, updated_at FROM comics WHERE file_path = ?").get(fullLogical);
-        await processComic(fullPhysical, fullLogical, db, coversDir, existing == null ? void 0 : existing.id, stats);
+        await processComic(fullPhysical, fullLogical, db, coversDir, existing == null ? void 0 : existing.id);
       } catch (e) {
-        stats.errors.push(`Error processing ${entry.name}: ${e.message}`);
+        const job2 = getJob();
+        if (job2) job2.stats.errors.push(`Error processing ${entry.name}: ${e.message}`);
       }
     }
   } catch (e) {
-    stats.errors.push(`Cannot read directory: ${e.message}`);
+    const job = getJob();
+    if (job) job.stats.errors.push(`Cannot read directory: ${e.message}`);
   }
 }
-async function processComic(physicalPath, logicalPath, db, coversDir, existingId, stats) {
+async function processComic(physicalPath, logicalPath, db, coversDir, existingId) {
   const fileName = physicalPath.split("/").pop() || logicalPath;
   const parsed = parseFilename(fileName);
   let metadata = {};
@@ -3017,7 +3370,8 @@ async function processComic(physicalPath, logicalPath, db, coversDir, existingId
     };
   }
   let coverPath = "";
-  const coverBuffer = extractFirstPageImage(physicalPath);
+  let coverBuffer = null;
+  coverBuffer = extractFirstPageImage(physicalPath);
   let isNew = false;
   if (!existingId) {
     const pageCount2 = countPages(physicalPath);
@@ -3043,6 +3397,7 @@ async function processComic(physicalPath, logicalPath, db, coversDir, existingId
   }
   if (coverBuffer) {
     const coverFile = coverPathFor(physicalPath);
+    updateJob({ phase: `Generating cover for ${fileName}` });
     const success = await generateCover(coverBuffer, {
       title: metadata.title || parsed.title,
       series: metadata.title || parsed.title,
@@ -3133,7 +3488,9 @@ async function processComic(physicalPath, logicalPath, db, coversDir, existingId
   }
   const archiveType = getArchiveType(physicalPath);
   let pageCount = 0;
-  if (archiveType !== "pdf") {
+  if (archiveType === "pdf") {
+    pageCount = countPdfPages(physicalPath);
+  } else {
     const pages = listArchiveImages(physicalPath);
     pageCount = pages.length;
   }
@@ -3158,13 +3515,33 @@ async function processComic(physicalPath, logicalPath, db, coversDir, existingId
     slug,
     existingId
   );
-  if (isNew) stats.newComics++;
-  else stats.updatedComics++;
+  const job = getJob();
+  if (job) {
+    if (isNew) job.stats.newComics++;
+    else job.stats.updatedComics++;
+    updateJob({ stats: { ...job.stats } });
+  }
 }
 
 const scan_post$1 = /*#__PURE__*/Object.freeze({
   __proto__: null,
   default: scan_post
+});
+
+const status_get = defineEventHandler(async (_event) => {
+  const job = getJob();
+  if (!job) {
+    return { active: false };
+  }
+  return {
+    active: job.status === "running",
+    ...job
+  };
+});
+
+const status_get$1 = /*#__PURE__*/Object.freeze({
+  __proto__: null,
+  default: status_get
 });
 
 const index = defineEventHandler(async (event) => {

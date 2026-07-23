@@ -23,11 +23,11 @@ export default defineNuxtConfig({
     head: {
       title: "Sequent — Comic Reader",
       link: [
-        {
-          rel: "icon",
-          type: "image/png",
-          href: "/favicon.ico",
-        },
+        // ── Favicons ──────────────────────────────────────────────────────
+        { rel: "icon", type: "image/png", sizes: "64x64", href: "/favicon.png" },
+        { rel: "icon", type: "image/png", sizes: "128x128", href: "/favicon-128.png" },
+        { rel: "apple-touch-icon", sizes: "320x320", href: "/apple-touch-icon.png" },
+        // ── Fonts ─────────────────────────────────────────────────────────
         {
           rel: "stylesheet",
           href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap",

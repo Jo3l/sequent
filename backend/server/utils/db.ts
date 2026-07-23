@@ -61,6 +61,7 @@ function initSchema(db: Database.Database): void {
       year TEXT DEFAULT '',
       publisher TEXT DEFAULT '',
       page_count INTEGER DEFAULT 0,
+      slug TEXT DEFAULT '',
       metadata_json TEXT DEFAULT '{}',
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -86,14 +87,16 @@ function initSchema(db: Database.Database): void {
     );
   `);
 
-  // Ensure default /comics local folder exists
-  const defaultPath = process.env.COMICS_DIR || "../comics";
+  // Migration: add slug column if missing (added after initial schema)
+  try { db.exec("ALTER TABLE comics ADD COLUMN slug TEXT DEFAULT ''"); } catch { /* column exists */ }
+
+  // Ensure default ./comics local folder exists (always fixed)
   const existing = db.prepare(
-    "SELECT id FROM library_folders WHERE type = 'local' AND path = ?"
-  ).get(defaultPath);
+    "SELECT id FROM library_folders WHERE type = 'local' AND path = './comics'"
+  ).get();
   if (!existing) {
     db.prepare(
-      "INSERT INTO library_folders (path, label, type, active) VALUES (?, 'Comics', 'local', 1)"
-    ).run(defaultPath);
+      "INSERT INTO library_folders (path, label, type, active) VALUES ('./comics', 'Comics', 'local', 1)"
+    ).run();
   }
 }

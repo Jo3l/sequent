@@ -43,7 +43,7 @@
         </template>
         <template v-else-if="viewMode === 'strip-v'">
           <div ref="stripWrapRef" class="cr-strip-v">
-            <div v-for="p in pageCount" :key="p" :ref="(el) => setStripRef(p - 1, el)" class="cr-strip-page"><div class="cr-strip-label">Page {{ p }}</div><img :src="pageUrl(p)" class="cr-strip-img" :style="{ transform: `rotate(${rotation}deg)` }" loading="lazy" draggable="false"/></div>
+            <div v-for="p in pageCount" :key="p" :ref="(el: any) => setStripRef(p - 1, el)" class="cr-strip-page"><div class="cr-strip-label">Page {{ p }}</div><img :src="pageUrl(p)" class="cr-strip-img" :style="{ transform: `rotate(${rotation}deg)` }" loading="lazy" draggable="false"/></div>
           </div>
         </template>
         <template v-else-if="viewMode === 'strip-h'">
@@ -54,8 +54,8 @@
         <!-- Single mode with animated transition -->
         <template v-else>
           <div class="cr-single-wrap" :class="'cr-fit--' + fitMode">
-            <!-- Base: current page (z-index:2, always visible) -->
-            <img :src="baseSrc" class="cr-page-img cr-img-base" :style="{ transform: `rotate(${rotation}deg)` }" draggable="false"/>
+            <!-- Base: current page (z-index:2, clipped complementarily during animation) -->
+            <img :src="baseSrc" class="cr-page-img cr-img-base" :style="baseStyle" draggable="false"/>
             <!-- Overlay: new page (z-index:3, with animated clip-path + fade-in) -->
             <img v-if="animSrc" :src="animSrc" class="cr-page-img cr-img-anim cr-fade-in" :style="animStyle" draggable="false"/>
           </div>
@@ -68,8 +68,26 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from "vue";
 
-const props = defineProps<{ visible: boolean; comicId: number; comicTitle: string; pageCount: number }>();
+const props = defineProps<{
+  visible: boolean;
+  comicId: number;
+  comicTitle: string;
+  pageCount: number;
+}>();
 const emit = defineEmits<{ close: [] }>();
+
+// Internal comic state — initialized from props, then self-managed for cross-comic nav
+const comicId = ref(props.comicId);
+const comicTitle = ref(props.comicTitle);
+const pageCount = ref(props.pageCount);
+const nextId = ref<number | null>(null);
+const prevId = ref<number | null>(null);
+const comicSlug = ref("");
+
+// Sync from props on external changes (e.g. parent navigates to different comic)
+watch(() => props.comicId, (v) => { comicId.value = v; });
+watch(() => props.comicTitle, (v) => { comicTitle.value = v; });
+watch(() => props.pageCount, (v) => { pageCount.value = v; });
 
 const currentPage = ref(1);
 const loading = ref(false); const error = ref("");
@@ -84,7 +102,7 @@ let animId = 0;
 
 // Base shows the OLD page during animation, updates after
 const basePage = ref(1);
-const baseSrc = computed(() => basePage.value > 0 && basePage.value <= props.pageCount ? pageUrl(basePage.value) : "");
+const baseSrc = computed(() => basePage.value > 0 && basePage.value <= pageCount.value ? pageUrl(basePage.value) : "");
 
 const viewMode = ref<"single" | "double" | "strip-v" | "strip-h">("single");
 const fitMode = ref<"best" | "height" | "width">("best");
@@ -103,10 +121,10 @@ const menuStyle = computed(() => {
 
 function closeDropdown() { showViewMenu.value = false; }
 function setStripRef(i: number, el: any) { if (el instanceof HTMLElement) stripPageRefs.value[i] = el; }
-function pageUrl(p: number) { return `/api/comics/${props.comicId}/pages/${p}`; }
-const currentSrc = computed(() => currentPage.value > 0 && currentPage.value <= props.pageCount ? pageUrl(currentPage.value) : "");
+function pageUrl(p: number) { return `/api/comics/${comicId.value}/pages/${p}`; }
+const currentSrc = computed(() => currentPage.value > 0 && currentPage.value <= pageCount.value ? pageUrl(currentPage.value) : "");
 const leftSrc = computed(() => currentPage.value > 0 ? pageUrl(currentPage.value) : "");
-const rightSrc = computed(() => currentPage.value < props.pageCount ? pageUrl(currentPage.value + 1) : "");
+const rightSrc = computed(() => currentPage.value < pageCount.value ? pageUrl(currentPage.value + 1) : "");
 
 // CodePen clip-path shapes mapped to 0-100% coordinates
 // Phase 1: thin edge → diagonal sweep. Phase 2: diagonal → full
@@ -145,6 +163,43 @@ const animStyle = computed(() => {
   return s;
 });
 
+// Base image gets the complementary clip-path so the old page
+// doesn't peek through the edges of the new page during animation.
+const baseStyle = computed(() => {
+  let s = `transform: rotate(${rotation.value}deg)`;
+  if (!animSrc.value) return s;
+  const t = animProgress.value;
+  const dir = animDir.value;
+  if (dir > 0) {
+    // NEXT: overlay sweeps right→left, base complements left→right
+    if (t < 0.5) {
+      const p = ease1(t / 0.5);
+      const x1 = 99.8 - p * 60;
+      const x2 = 99.8 - p * 75;
+      s += `; clip-path: polygon(0 0, ${x1}% 0, ${x2}% 100%, 0 100%)`;
+    } else {
+      const p = ease2((t - 0.5) / 0.5);
+      const x1 = 39.8 - p * 39.8;
+      const x2 = 24.8 - p * 24.8;
+      s += `; clip-path: polygon(0 0, ${x1}% 0, ${x2}% 100%, 0 100%)`;
+    }
+  } else {
+    // PREV: overlay sweeps left→right, base complements right→left
+    if (t < 0.5) {
+      const p = ease1(t / 0.5);
+      const x1 = 0.2 + p * 60;
+      const x2 = 0.2 + p * 75;
+      s += `; clip-path: polygon(${x1}% 0, 100% 0, 100% 100%, ${x2}% 100%)`;
+    } else {
+      const p = ease2((t - 0.5) / 0.5);
+      const x1 = 60.2 + p * 39.8;
+      const x2 = 75.2 + p * 24.8;
+      s += `; clip-path: polygon(${x1}% 0, 100% 0, 100% 100%, ${x2}% 100%)`;
+    }
+  }
+  return s;
+});
+
 function ease1(t: number): number { // cubic-bezier(0.42, 0.03, 0.77, 0.63)
   const u = 1 - t;
   return 3 * u * u * t * 0.03 + 3 * u * t * t * 0.77 + t * t * t;
@@ -156,10 +211,22 @@ function ease2(t: number): number { // cubic-bezier(0.27, 0.5, 0.6, 0.99)
 
 // ── Load
 async function load() {
-  if (!props.visible || !props.comicId) return;
+  if (!props.visible || !comicId.value) return;
   loading.value = true; error.value = "";
+
+  // Fetch comic info to get nextId/prevId and accurate page count
+  try {
+    const data = await $fetch<any>(`/api/comics/${comicId.value}`);
+    const c = data.comic;
+    comicTitle.value = c.title || c.file_name;
+    pageCount.value = c.page_count || 1;
+    nextId.value = data.nextId ?? null;
+    prevId.value = data.prevId ?? null;
+    comicSlug.value = c.slug || "";
+  } catch { /* use props */ }
+
   const hp = parseInt((window.location.hash || "").replace(/^#p?/, ""), 10);
-  const p = (hp >= 1 && hp <= props.pageCount) ? hp : 1;
+  const p = (hp >= 1 && hp <= pageCount.value) ? hp : 1;
   currentPage.value = p;
   basePage.value = p;
   try { const r = await fetch(pageUrl(p)); if (!r.ok) throw new Error(`status ${r.status}`); }
@@ -172,7 +239,7 @@ watch(() => props.comicId, () => { if (props.visible) load(); });
 
 function preloadAdjacent(p: number) {
   for (let i = p - 2; i <= p + 2; i++) {
-    if (i >= 1 && i <= props.pageCount && i !== p) {
+    if (i >= 1 && i <= pageCount.value && i !== p) {
       const img = new Image();
       img.src = pageUrl(i);
     }
@@ -189,17 +256,17 @@ async function loadImage(p: number): Promise<void> {
 }
 
 // ── Hash
-function updateHash(p: number) { if (props.visible && p > 0) history.replaceState(null, "", `#${p}`); }
+function updateHash(p: number) { if (props.visible && p > 0) history.replaceState(null, "", `#p${p}`); }
 function onHashChange() {
   if (!props.visible) return;
   const p = parseInt((window.location.hash || "").replace(/^#p?/, ""), 10);
-  if (p >= 1 && p <= props.pageCount && p !== currentPage.value) goToPage(p);
+  if (p >= 1 && p <= pageCount.value && p !== currentPage.value) goToPage(p);
 }
 onMounted(() => window.addEventListener("hashchange", onHashChange));
 onUnmounted(() => window.removeEventListener("hashchange", onHashChange));
 
 function goToPage(n: number) {
-  const p = Math.max(1, Math.min(props.pageCount, n));
+  const p = Math.max(1, Math.min(pageCount.value, n));
   currentPage.value = p; basePage.value = p; updateHash(p);
   if (viewMode.value === "strip-v" || viewMode.value === "strip-h") scrollToStrip();
 }
@@ -214,7 +281,18 @@ function onStripScroll() {
 // ── Animated page turn (CodePen: new slide overlays with animated clip-path)
 async function pageTurn(dir: 1 | -1) {
   if (viewMode.value !== "single" || animating) { dir > 0 ? goToPage(currentPage.value + 1) : goToPage(currentPage.value - 1); return; }
-  const target = dir > 0 ? Math.min(props.pageCount, currentPage.value + 1) : Math.max(1, currentPage.value - 1);
+
+  // Check for cross-comic navigation at boundaries
+  if (dir > 0 && currentPage.value >= pageCount.value) {
+    if (nextId.value) { await loadComic(nextId.value, 1); }
+    return;
+  }
+  if (dir < 0 && currentPage.value <= 1) {
+    if (prevId.value) { await loadComic(prevId.value, -1); }
+    return;
+  }
+
+  const target = dir > 0 ? Math.min(pageCount.value, currentPage.value + 1) : Math.max(1, currentPage.value - 1);
   if (target === currentPage.value) return;
   animating = true;
 
@@ -247,6 +325,39 @@ async function pageTurn(dir: 1 | -1) {
   basePage.value = target;
   animSrc.value = "";
   animating = false;
+}
+
+/**
+ * Load a different comic and jump to its first or last page.
+ * Updates internal state and browser URL.
+ */
+async function loadComic(newId: number, startPage: number) {
+  try {
+    const data = await $fetch<any>(`/api/comics/${newId}`);
+    const c = data.comic;
+
+    comicId.value = c.id;
+    comicTitle.value = c.title || c.file_name;
+    pageCount.value = c.page_count || 1;
+    nextId.value = data.nextId ?? null;
+    prevId.value = data.prevId ?? null;
+    comicSlug.value = c.slug || "";
+
+    // Go to first or last page
+    const targetPage = startPage > 0 ? 1 : pageCount.value;
+    currentPage.value = targetPage;
+    basePage.value = targetPage;
+
+    // Update URL to new comic + page hash
+    const slugPart = comicSlug.value ? `-${comicSlug.value}` : "";
+    const newPath = `/comic/${comicId.value}${slugPart}#p${targetPage}`;
+    history.replaceState(null, "", newPath);
+
+    // Preload pages for the new comic
+    preloadAdjacent(targetPage);
+  } catch {
+    // silently fail — stay on current comic
+  }
 }
 
 function onBodyClick(e: MouseEvent) {
@@ -303,8 +414,10 @@ function onKeydown(e: KeyboardEvent) {
   if (e.key === "Escape") close();
   else if (e.key === "ArrowLeft" || e.key === "a" || e.key === "A") pageTurn(-1);
   else if (e.key === "ArrowRight" || e.key === "d" || e.key === "D") pageTurn(1);
+  else if (e.key === "ArrowUp") { showHeader.value = false; }
+  else if (e.key === "ArrowDown") { showHeader.value = true; }
   else if (e.key === "Home") goToPage(1);
-  else if (e.key === "End") goToPage(props.pageCount);
+  else if (e.key === "End") goToPage(pageCount.value);
   else if (e.key === "f" || e.key === "F") toggleFullscreen();
   else if (e.key === "1") viewMode.value = "single";
   else if (e.key === "2") viewMode.value = "double";
@@ -349,7 +462,11 @@ watch(() => props.visible, (v) => { if (v) nextTick(() => overlayRef.value?.focu
 .cr-fade-in{animation:cr-fade-in .125s ease both}
 @keyframes cr-fade-in{0%{opacity:0}100%{opacity:1}}
 .cr-fit--height .cr-page-img{max-width:none;height:100%;width:auto}
-.cr-fit--width .cr-page-img{max-height:none;width:100%;height:auto}
+/* Fit-width: allow vertical scroll for tall pages */
+.cr-single-wrap.cr-fit--width{overflow-y:auto;align-items:flex-start;justify-content:flex-start}
+.cr-single-wrap.cr-fit--width .cr-page-img{max-height:none;width:100%;height:auto}
+.cr-double-wrap.cr-fit--width{overflow-y:auto;align-items:flex-start}
+.cr-double-wrap.cr-fit--width .cr-page-img{max-height:none;height:auto}
 .cr-double-wrap{flex:1;display:flex;overflow:hidden}
 .cr-double-wrap .cr-page-img{width:50%;height:100%;object-fit:contain;cursor:pointer}
 .cr-strip-v{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;gap:2rem;padding:1.5rem 1rem 3rem}

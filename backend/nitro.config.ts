@@ -8,6 +8,7 @@ export default defineNitroConfig({
     comicVineApiKey: { default: "" },
   },
   devServer: {
+    port: 3233,
     host: "0.0.0.0",
     watch: ["server"],
   },

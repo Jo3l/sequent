@@ -48,6 +48,32 @@
             <SButton variant="primary" size="lg" @click="startReading">
               📖 Read Now
             </SButton>
+            <SButton
+              variant="secondary"
+              size="lg"
+              @click="enhanceComic"
+              :loading="enhancing"
+              :disabled="enhancing || enhanceComplete"
+            >
+              ✨ {{ enhanceButtonText }}
+            </SButton>
+          </div>
+
+          <!-- Enhancement progress -->
+          <div v-if="enhancing || enhanceError || enhanceComplete" class="enhance-progress">
+            <div v-if="enhancing" class="enhance-progress-bar">
+              <div class="enhance-progress-fill" :style="{ width: enhanceProgressPct + '%' }"></div>
+            </div>
+            <div class="enhance-progress-text">
+              <span v-if="enhancing">🔄 {{ enhancePhase }}</span>
+              <span v-else-if="enhanceComplete" class="enhance-success">
+                ✅ Cómic mejorado guardado en /comics
+              </span>
+              <span v-else-if="enhanceError" class="enhance-error">❌ {{ enhanceError }}</span>
+            </div>
+            <div v-if="enhancing" class="enhance-progress-pages">
+              {{ enhanceCurrentPage }} / {{ enhanceTotalPages }} páginas
+            </div>
           </div>
 
           <!-- Summary -->
@@ -166,10 +192,16 @@ const { apiFetch } = useApi();
 const comic = ref<any>(null);
 const loading = ref(true);
 const readerOpen = ref(false);
+const nextId = ref<number | null>(null);
+const prevId = ref<number | null>(null);
 
 const comicId = computed(() => parseInt(String(route.params.id), 10));
 
-const coverUrl = computed(() => comic.value?.cover_path ? `/api/covers/${comic.value.id}` : "");
+const coverUrl = computed(() => {
+  if (!comic.value?.cover_path) return "";
+  const s = comic.value.slug || "";
+  return s ? `/api/covers/by-slug/${s}` : `/api/covers/${comic.value.id}`;
+});
 
 const displayTitle = computed(() => comic.value?.title || comic.value?.file_name || "Untitled");
 
@@ -206,6 +238,8 @@ async function fetchComic() {
   try {
     const data = await apiFetch<any>(`/api/comics/${comicId.value}`);
     comic.value = data.comic;
+    nextId.value = data.nextId ?? null;
+    prevId.value = data.prevId ?? null;
   } catch { /* ignore */ }
   loading.value = false;
 }
@@ -232,6 +266,7 @@ onMounted(async () => {
   if (pageFromHash >= 1) {
     readerOpen.value = true;
   }
+  checkEnhanceStatus();
 });
 
 // ── Manual match ────────────────────────────────────────────────────────────
@@ -240,6 +275,24 @@ const suggestions = ref<any[]>([]);
 const selectedCvId = ref<number | null>(null);
 const matchLoading = ref(false);
 const matchSaving = ref(false);
+
+// ── AI Enhancement ──────────────────────────────────────────────────────────
+const enhancing = ref(false);
+const enhanceComplete = ref(false);
+const enhanceError = ref("");
+const enhancePhase = ref("");
+const enhanceCurrentPage = ref(0);
+const enhanceTotalPages = ref(0);
+const enhanceProgressPct = ref(0);
+const downloadPath = ref("");
+const downloadName = ref("");
+let enhancePollTimer: ReturnType<typeof setInterval> | null = null;
+
+const enhanceButtonText = computed(() => {
+  if (enhanceComplete.value) return "¡Mejorado! ✨";
+  if (enhancing.value) return "Mejorando...";
+  return "Mejorar calidad con IA";
+});
 
 async function openMatchModal() {
   showMatchModal.value = true;
@@ -275,6 +328,90 @@ function truncate(s: string, n: number): string {
   if (!s) return "";
   return s.length > n ? s.slice(0, n) + "..." : s;
 }
+
+async function checkEnhanceStatus() {
+  try {
+    const data = await apiFetch<{
+      active: boolean; status: string; phase: string;
+      currentPage: number; totalPages: number; progressPct: number;
+      error?: string; downloadPath?: string; downloadName?: string;
+    }>(`/api/comics/${comicId.value}/enhance/status`);
+    if (data.active) {
+      enhancing.value = true;
+      enhancePhase.value = data.phase || "";
+      enhanceCurrentPage.value = data.currentPage || 0;
+      enhanceTotalPages.value = data.totalPages || 0;
+      enhanceProgressPct.value = data.progressPct || 0;
+      startEnhancePolling();
+    } else if (data.status === "completed") {
+      enhanceComplete.value = true;
+      downloadPath.value = data.downloadPath || "";
+      downloadName.value = data.downloadName || "";
+    } else if (data.status === "error") {
+      enhanceError.value = data.error || "Enhancement failed";
+    }
+  } catch { /* ignore */ }
+}
+
+async function enhanceComic() {
+  if (enhancing.value || enhanceComplete.value) return;
+  enhancing.value = true;
+  enhanceError.value = "";
+  enhanceComplete.value = false;
+  enhancePhase.value = "Iniciando...";
+  enhanceCurrentPage.value = 0;
+  enhanceTotalPages.value = 0;
+  enhanceProgressPct.value = 0;
+  try {
+    const data = await apiFetch<{ success: boolean; jobId: string }>(
+      `/api/comics/${comicId.value}/enhance`,
+      { method: "POST" },
+    );
+    if (data.success) startEnhancePolling();
+  } catch (e: any) {
+    enhancing.value = false;
+    enhanceError.value = e?.data?.statusMessage || e?.message || "Failed to start enhancement";
+  }
+}
+
+function startEnhancePolling() {
+  if (enhancePollTimer) return;
+  enhancePollTimer = setInterval(async () => {
+    try {
+      const data = await apiFetch<{
+        active: boolean; status: string; phase: string;
+        currentPage: number; totalPages: number; progressPct: number;
+        error?: string; downloadPath?: string; downloadName?: string;
+      }>(`/api/comics/${comicId.value}/enhance/status`);
+      enhancePhase.value = data.phase || "";
+      enhanceCurrentPage.value = data.currentPage || 0;
+      enhanceTotalPages.value = data.totalPages || 0;
+      enhanceProgressPct.value = data.progressPct || 0;
+      if (data.status === "completed") {
+        enhancing.value = false;
+        enhanceComplete.value = true;
+        downloadPath.value = data.downloadPath || "";
+        downloadName.value = data.downloadName || "";
+        stopEnhancePolling();
+      } else if (data.status === "error") {
+        enhancing.value = false;
+        enhanceError.value = data.error || "Enhancement failed";
+        stopEnhancePolling();
+      }
+    } catch { /* ignore polling errors */ }
+  }, 10000);
+}
+
+function stopEnhancePolling() {
+  if (enhancePollTimer) {
+    clearInterval(enhancePollTimer);
+    enhancePollTimer = null;
+  }
+}
+
+onUnmounted(() => {
+  stopEnhancePolling();
+});
 </script>
 
 <style scoped>
@@ -300,7 +437,7 @@ function truncate(s: string, n: number): string {
 }
 .detail-row { display: flex; gap: 0.5rem; font-size: 0.875rem; color: var(--color-text-muted); }
 .detail-label { min-width: 80px; font-weight: 500; color: var(--color-text-dim); }
-.detail-actions { margin: 0.5rem 0; }
+.detail-actions { margin: 0.5rem 0; display: flex; gap: 0.75rem; flex-wrap: wrap; }
 .detail-match-area {
   margin: 1rem 0; padding: 1rem; border-radius: var(--radius-md);
   border: 1px dashed var(--color-warning);
@@ -323,6 +460,43 @@ function truncate(s: string, n: number): string {
   border-top-color: var(--color-primary); border-radius: 50%; animation: spin 0.6s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Enhancement progress */
+.enhance-progress {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+}
+.enhance-progress-bar {
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+.enhance-progress-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+.enhance-progress-text {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin-bottom: 0.25rem;
+}
+.enhance-progress-text a {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+.enhance-success { color: var(--color-success); }
+.enhance-error { color: var(--color-danger); }
+.enhance-progress-pages {
+  font-size: 0.75rem;
+  color: var(--color-text-dim);
+}
 @media (max-width: 640px) { .detail-body { flex-direction: column; } .detail-cover { width: 200px; } }
 </style>
 

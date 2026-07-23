@@ -22,6 +22,12 @@ declare module "nitropack/types" {
     '/api/comics/:id': {
       'default': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/comics/[id]').default>>>>
     }
+    '/api/comics/:id/enhance': {
+      'post': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/comics/[id]/enhance.post').default>>>>
+    }
+    '/api/comics/:id/enhance/status': {
+      'get': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/comics/[id]/enhance/status.get').default>>>>
+    }
     '/api/comics/:id/match': {
       'post': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/comics/[id]/match.post').default>>>>
     }
@@ -37,6 +43,9 @@ declare module "nitropack/types" {
     '/api/covers/:id': {
       'get': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/covers/[id].get').default>>>>
     }
+    '/api/covers/by-slug/:slug': {
+      'get': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/covers/by-slug/[slug].get').default>>>>
+    }
     '/api/health': {
       'get': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/health.get').default>>>>
     }
@@ -48,6 +57,9 @@ declare module "nitropack/types" {
     }
     '/api/scan': {
       'post': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/scan.post').default>>>>
+    }
+    '/api/scan/status': {
+      'get': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/scan/status.get').default>>>>
     }
     '/api/settings': {
       'default': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/settings/index').default>>>>

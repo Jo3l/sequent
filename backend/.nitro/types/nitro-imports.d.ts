@@ -12,12 +12,15 @@ declare global {
   const clearResponseHeaders: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').clearResponseHeaders
   const clearSession: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').clearSession
   const computePHash: typeof import('../../server/utils/localCvDb').computePHash
+  const countPdfPages: typeof import('../../server/utils/comicArchive').countPdfPages
   const coverPathFor: typeof import('../../server/utils/comicCover').coverPathFor
   const createApp: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').createApp
   const createAppEventHandler: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').createAppEventHandler
+  const createEnhanceJob: typeof import('../../server/utils/enhanceState').createEnhanceJob
   const createError: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').createError
   const createEvent: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').createEvent
   const createEventStream: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').createEventStream
+  const createJob: typeof import('../../server/utils/scanState').createJob
   const createRouter: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').createRouter
   const createToken: typeof import('../../server/utils/jwt').createToken
   const defaultContentType: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').defaultContentType
@@ -42,7 +45,11 @@ declare global {
   const extractComicInfoXml: typeof import('../../server/utils/comicArchive').extractComicInfoXml
   const extractFirstPageImage: typeof import('../../server/utils/comicArchive').extractFirstPageImage
   const extractImageFromArchive: typeof import('../../server/utils/comicArchive').extractImageFromArchive
+  const failEnhanceJob: typeof import('../../server/utils/enhanceState').failEnhanceJob
+  const failJob: typeof import('../../server/utils/scanState').failJob
   const fetchWithEvent: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').fetchWithEvent
+  const finishEnhanceJob: typeof import('../../server/utils/enhanceState').finishEnhanceJob
+  const finishJob: typeof import('../../server/utils/scanState').finishJob
   const fromNodeMiddleware: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').fromNodeMiddleware
   const fromPlainHandler: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').fromPlainHandler
   const fromWebHandler: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').fromWebHandler
@@ -54,9 +61,11 @@ declare global {
   const getDataDir: typeof import('../../server/utils/db').getDataDir
   const getDataPath: typeof import('../../server/utils/db').getDataPath
   const getDb: typeof import('../../server/utils/db').getDb
+  const getEnhanceJob: typeof import('../../server/utils/enhanceState').getEnhanceJob
   const getHeader: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getHeader
   const getHeaders: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getHeaders
   const getIssue: typeof import('../../server/utils/localCvDb').getIssue
+  const getJob: typeof import('../../server/utils/scanState').getJob
   const getMethod: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getMethod
   const getProxyRequestHeaders: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getProxyRequestHeaders
   const getQuery: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').getQuery
@@ -83,6 +92,7 @@ declare global {
   const handleCors: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').handleCors
   const isComicFile: typeof import('../../server/utils/comicArchive').isComicFile
   const isCorsOriginAllowed: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').isCorsOriginAllowed
+  const isEnhancing: typeof import('../../server/utils/enhanceState').isEnhancing
   const isError: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').isError
   const isEvent: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').isEvent
   const isEventHandler: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').isEventHandler
@@ -145,6 +155,8 @@ declare global {
   const toWebRequest: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').toWebRequest
   const unmountSmbShare: typeof import('../../server/utils/samba').unmountSmbShare
   const unsealSession: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').unsealSession
+  const updateEnhanceJob: typeof import('../../server/utils/enhanceState').updateEnhanceJob
+  const updateJob: typeof import('../../server/utils/scanState').updateJob
   const updateSession: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').updateSession
   const useAppConfig: typeof import('../../../node_modules/.pnpm/nitropack@2.13.4_better-sqlite3@11.10.0_oxc-parser@0.140.0_srvx@0.11.22_vite@5.4.21_@types+node@26.1.1_terser@5.49.0_/node_modules/nitropack/dist/runtime/internal/config').useAppConfig
   const useBase: typeof import('../../../node_modules/.pnpm/h3@1.15.11/node_modules/h3').useBase
@@ -165,6 +177,9 @@ declare global {
   export type { CvSearchResult, CvIssueDetail } from '../../server/utils/comicVine'
   import('../../server/utils/comicVine')
   // @ts-ignore
+  export type { EnhanceJob } from '../../server/utils/enhanceState'
+  import('../../server/utils/enhanceState')
+  // @ts-ignore
   export type { ParsedFilename } from '../../server/utils/filenameParser'
   import('../../server/utils/filenameParser')
   // @ts-ignore
@@ -176,6 +191,9 @@ declare global {
   // @ts-ignore
   export type { SmbMount } from '../../server/utils/samba'
   import('../../server/utils/samba')
+  // @ts-ignore
+  export type { ScanStats, ScanJob } from '../../server/utils/scanState'
+  import('../../server/utils/scanState')
 }
 export { useNitroApp } from 'nitropack/runtime/internal/app';
 export { useRuntimeConfig, useAppConfig } from 'nitropack/runtime/internal/config';
@@ -189,12 +207,14 @@ export { useEvent } from 'nitropack/runtime/internal/context';
 export { defineTask, runTask } from 'nitropack/runtime/internal/task';
 export { defineNitroErrorHandler } from 'nitropack/runtime/internal/error/utils';
 export { appendCorsHeaders, appendCorsPreflightHeaders, appendHeader, appendHeaders, appendResponseHeader, appendResponseHeaders, assertMethod, callNodeListener, clearResponseHeaders, clearSession, createApp, createAppEventHandler, createError, createEvent, createEventStream, createRouter, defaultContentType, defineEventHandler, defineLazyEventHandler, defineNodeListener, defineNodeMiddleware, defineRequestMiddleware, defineResponseMiddleware, defineWebSocket, defineWebSocketHandler, deleteCookie, dynamicEventHandler, eventHandler, fetchWithEvent, fromNodeMiddleware, fromPlainHandler, fromWebHandler, getCookie, getHeader, getHeaders, getMethod, getProxyRequestHeaders, getQuery, getRequestFingerprint, getRequestHeader, getRequestHeaders, getRequestHost, getRequestIP, getRequestPath, getRequestProtocol, getRequestURL, getRequestWebStream, getResponseHeader, getResponseHeaders, getResponseStatus, getResponseStatusText, getRouterParam, getRouterParams, getSession, getValidatedQuery, getValidatedRouterParams, handleCacheHeaders, handleCors, isCorsOriginAllowed, isError, isEvent, isEventHandler, isMethod, isPreflightRequest, isStream, isWebResponse, lazyEventHandler, parseCookies, promisifyNodeListener, proxyRequest, readBody, readFormData, readMultipartFormData, readRawBody, readValidatedBody, removeResponseHeader, sanitizeStatusCode, sanitizeStatusMessage, sealSession, send, sendError, sendIterable, sendNoContent, sendProxy, sendRedirect, sendStream, sendWebResponse, serveStatic, setCookie, setHeader, setHeaders, setResponseHeader, setResponseHeaders, setResponseStatus, splitCookiesString, toEventHandler, toNodeListener, toPlainHandler, toWebHandler, toWebRequest, unsealSession, updateSession, useBase, useSession, writeEarlyHints } from 'h3';
-export { getArchiveType, isComicFile, extractComicInfoXml, parseComicInfoXml, getComicInfo, extractFirstPageImage, listArchiveImages, extractImageFromArchive } from '/home/jo3l/www/sequent/backend/server/utils/comicArchive';
+export { getArchiveType, isComicFile, countPdfPages, extractComicInfoXml, parseComicInfoXml, getComicInfo, extractFirstPageImage, listArchiveImages, extractImageFromArchive } from '/home/jo3l/www/sequent/backend/server/utils/comicArchive';
 export { generateCover, coverPathFor, readCoverMetadata } from '/home/jo3l/www/sequent/backend/server/utils/comicCover';
 export { searchComicVine, getComicVineIssue } from '/home/jo3l/www/sequent/backend/server/utils/comicVine';
 export { getDataDir, getDataPath, getDb } from '/home/jo3l/www/sequent/backend/server/utils/db';
+export { createEnhanceJob, getEnhanceJob, updateEnhanceJob, finishEnhanceJob, failEnhanceJob, isEnhancing } from '/home/jo3l/www/sequent/backend/server/utils/enhanceState';
 export { parseFilename, normalizeFilename } from '/home/jo3l/www/sequent/backend/server/utils/filenameParser';
 export { createToken, verifyToken } from '/home/jo3l/www/sequent/backend/server/utils/jwt';
 export { sanitizeTitle, titlesMatch, searchVolumes, searchIssues, searchByCoverHash, searchCoversByHash, getIssue, matchByFilename, computePHash, matchIssueByCoverHash } from '/home/jo3l/www/sequent/backend/server/utils/localCvDb';
 export { mountSmbShare, unmountSmbShare, testSmbConnection } from '/home/jo3l/www/sequent/backend/server/utils/samba';
+export { createJob, getJob, updateJob, finishJob, failJob } from '/home/jo3l/www/sequent/backend/server/utils/scanState';
 export { slugify } from '/home/jo3l/www/sequent/backend/server/utils/slugify';

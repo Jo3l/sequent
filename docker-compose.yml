@@ -19,10 +19,11 @@ services:
       - "${PORT:-80}:80"
     volumes:
       - ${DATA_DIR:-./data}:/data
-      - ${COMICS_DIR:-./comics}:/comics:ro
+      - ${COMICS_DIR:-./comics}:/app/comics:ro
+    devices:
+      - /dev/dri:/dev/dri  # GPU passthrough for AI upscaling (upscayl-ncnn)
     environment:
       NITRO_JWT_SECRET: ${JWT_SECRET:-}
       COMIC_VINE_API_KEY: ${COMIC_VINE_API_KEY:-}
       DATA_DIR: /data
-      COMICS_DIR: /comics
       LOCALCVDB_PATH: ${LOCALCVDB_PATH:-/data/localcvdb/localcv.db}

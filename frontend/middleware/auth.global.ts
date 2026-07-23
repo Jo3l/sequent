@@ -18,7 +18,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
       if (to.path === "/login" && status.needsSetup) return navigateTo("/setup");
       if (to.path === "/setup" && !status.needsSetup) return navigateTo("/login");
     } catch {
-      if (to.path === "/login") return navigateTo("/setup");
+      // Backend unreachable — stay on current page, don't redirect.
+      // Let the user see the login/setup page and the actual error.
     }
     return;
   }
@@ -31,14 +32,8 @@ export default defineNuxtRouteMiddleware(async (to) => {
     if (!valid) return navigateTo("/login", { replace: true });
   }
 
-  // No token at all → check if system needs setup, otherwise redirect to login.
+  // No token at all → redirect to login.
   if (!auth.token.value) {
-    try {
-      const status = await $fetch<{ needsSetup: boolean }>("/api/auth/setup");
-      if (status.needsSetup) return navigateTo("/setup");
-    } catch {
-      return navigateTo("/setup");
-    }
     return navigateTo("/login", { replace: true });
   }
 

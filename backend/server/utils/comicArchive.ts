@@ -54,6 +54,20 @@ export function isComicFile(filePath: string): boolean {
 }
 
 /**
+ * Count pages in a PDF using pdfinfo (from poppler-utils).
+ * Returns 0 if pdfinfo is unavailable or fails.
+ */
+export function countPdfPages(pdfPath: string): number {
+  try {
+    const out = execSync(`pdfinfo "${pdfPath}"`, { stdio: "pipe", encoding: "utf-8", timeout: 10_000 });
+    const match = out.match(/^Pages:\s+(\d+)/m);
+    return match ? parseInt(match[1], 10) : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * Extract ComicInfo.xml from a comic archive using `unar` CLI.
  */
 export function extractComicInfoXml(archivePath: string): string | null {
