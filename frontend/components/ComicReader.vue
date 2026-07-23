@@ -242,17 +242,18 @@ function preloadAdjacent(p: number) {
     if (i >= 1 && i <= pageCount.value && i !== p) {
       const img = new Image();
       img.src = pageUrl(i);
+      // Decode immediately so rasterization doesn't compete with animation later
+      img.decode().catch(() => {});
     }
   }
 }
 
 async function loadImage(p: number): Promise<void> {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = () => resolve();
-    img.src = pageUrl(p);
-  });
+  const img = new Image();
+  img.src = pageUrl(p);
+  // decode() resolves only when the image is fully rasterized — not just downloaded.
+  // This guarantees zero decode-jank during the subsequent clip-path animation.
+  try { await img.decode(); } catch { /* broken image, continue anyway */ }
 }
 
 // ── Hash
